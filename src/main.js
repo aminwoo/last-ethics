@@ -721,16 +721,16 @@ function init() {
         updateStaminaBar();
         
         // Load sounds
-        reloadSound = new Audio('assets/sounds/reload.mp3');
+        reloadSound = new Audio('/assets/sounds/reload.mp3');
         reloadSound.volume = 1.0;
         
-        pistolShotSound = new Audio('assets/sounds/bulletshot-impact-sound-effect-230462.mp3');
+        pistolShotSound = new Audio('/assets/sounds/bulletshot-impact-sound-effect-230462.mp3');
         pistolShotSound.volume = 1.0;
         
-        shotgunShotSound = new Audio('assets/sounds/shotgun-sound.mp3');
+        shotgunShotSound = new Audio('/assets/sounds/shotgun-sound.mp3');
         shotgunShotSound.volume = 0.8;
         
-        smgShotSound = new Audio('assets/sounds/ak-47.mp3');
+        smgShotSound = new Audio('/assets/sounds/ak-47.mp3');
         smgShotSound.volume = 1.0;  
         smgShotSound.loop = true;  // Enable looping for SMG sound
         
