@@ -415,79 +415,109 @@ function initMultiplayer() {
         // Create bullet based on weapon type
         const weapon = WEAPONS[data.weapon];
         if (!weapon) return;
-        
-        // Create bullet
-        const bulletGeometry = new THREE.CylinderGeometry(
-            weapon.bulletSize,
-            weapon.bulletSize,
-            weapon.bulletLength,
-            8
-        );
-        bulletGeometry.rotateX(Math.PI / 2);
-        
-        const bulletMaterial = new THREE.MeshStandardMaterial({
-            color: weapon.color,
-            emissive: weapon.color,
-            emissiveIntensity: 0.5,
-            metalness: 0.8,
-            roughness: 0.2
-        });
-        
-        const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-        
-        // Position bullet at the other player's gun position
-        const gunOffset = new THREE.Vector3(0.5, 1.5, 0.2);
-        bullet.position.copy(otherPlayer.position).add(gunOffset);
-        
-        // Create bullet trail
-        const trailGeometry = new THREE.BufferGeometry();
-        const trailMaterial = new THREE.LineBasicMaterial({
-            color: weapon.color,
-            transparent: true,
-            opacity: 0.5
-        });
-        const trailPositions = new Float32Array(BULLET_TRAIL_LENGTH * 3);
-        
-        // Initialize trail positions
-        for (let j = 0; j < BULLET_TRAIL_LENGTH; j++) {
-            trailPositions[j * 3] = bullet.position.x;
-            trailPositions[j * 3 + 1] = bullet.position.y;
-            trailPositions[j * 3 + 2] = bullet.position.z;
+
+        // Create bullets based on weapon type
+        for (let i = 0; i < weapon.bulletsPerShot; i++) {
+            // Create bullet
+            const bulletGeometry = new THREE.CylinderGeometry(
+                weapon.bulletSize,
+                weapon.bulletSize,
+                weapon.bulletLength,
+                8
+            );
+            bulletGeometry.rotateX(Math.PI / 2);
+            
+            const bulletMaterial = new THREE.MeshStandardMaterial({
+                color: weapon.color,
+                emissive: weapon.color,
+                emissiveIntensity: 0.5,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            
+            // Position bullet at the other player's gun position
+            const gunOffset = new THREE.Vector3(0.5, 1.5, 0.2);
+            bullet.position.copy(otherPlayer.position).add(gunOffset);
+
+            // Special handling for shotgun spread pattern
+            if (weapon.name === "Shotgun") {
+                // Create a circular pattern for pellets
+                const angle = (i / weapon.bulletsPerShot) * Math.PI * 2;
+                const radius = 0.1; // Initial spread radius
+                bullet.position.x += Math.cos(angle) * radius;
+                bullet.position.y += Math.sin(angle) * radius;
+            }
+                
+            // Create bullet trail
+            const trailGeometry = new THREE.BufferGeometry();
+            const trailMaterial = new THREE.LineBasicMaterial({
+                color: weapon.color,
+                transparent: true,
+                opacity: 0.5
+            });
+            const trailPositions = new Float32Array(BULLET_TRAIL_LENGTH * 3);
+            
+            // Initialize trail positions
+            for (let j = 0; j < BULLET_TRAIL_LENGTH; j++) {
+                trailPositions[j * 3] = bullet.position.x;
+                trailPositions[j * 3 + 1] = bullet.position.y;
+                trailPositions[j * 3 + 2] = bullet.position.z;
+            }
+            
+            trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+            const trail = new THREE.Line(trailGeometry, trailMaterial);
+            scene.add(trail);
+            
+            // Set bullet direction from the data
+            const direction = new THREE.Vector3(data.direction.x, data.direction.y, data.direction.z).normalize();
+
+            // Apply spread based on weapon type
+            if (weapon.name === "Shotgun") {
+                // Conical spread pattern
+                const spreadAngle = weapon.spread * (1 - (i / weapon.bulletsPerShot)); // Tighter spread for center pellets
+                direction.x += (Math.random() - 0.5) * spreadAngle;
+                direction.y += (Math.random() - 0.5) * spreadAngle * 0.5; // Less vertical spread
+                direction.z += (Math.random() - 0.5) * spreadAngle;
+            } else {
+                direction.x += (Math.random() - 0.5) * weapon.spread;
+                direction.y += (Math.random() - 0.5) * weapon.spread;
+                direction.z += (Math.random() - 0.5) * weapon.spread;
+            }
+            direction.normalize();
+            
+            // Rotate bullet to face direction
+            bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+            
+            // Add bullet to scene
+            scene.add(bullet);
+
+            // Store bullet data
+            const bulletData = {
+                mesh: bullet,
+                trail: trail,
+                trailPositions: trailPositions,
+                direction: direction,
+                velocity: direction.clone().multiplyScalar(
+                    weapon.name === "Shotgun" 
+                        ? weapon.bulletSpeed * (0.7 + Math.random() * 0.3) // Reduced speed variation from 0.8-1.2 to 0.7-1.0
+                        : weapon.bulletSpeed
+                ),
+                speed: weapon.bulletSpeed,
+                damage: weapon.damage,
+                distance: 0,
+                maxDistance: 50,
+                createdAt: Date.now(),
+                playerId: data.playerId
+            };
+            
+            // Add to other player bullets map
+            if (!otherPlayerBullets.has(data.playerId)) {
+                otherPlayerBullets.set(data.playerId, []);
+            }
+            otherPlayerBullets.get(data.playerId).push(bulletData);
         }
-        
-        trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
-        const trail = new THREE.Line(trailGeometry, trailMaterial);
-        scene.add(trail);
-        
-        // Set bullet direction from the data
-        const direction = new THREE.Vector3(data.direction.x, data.direction.y, data.direction.z).normalize();
-        
-        // Rotate bullet to face direction
-        bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
-        
-        // Add bullet to scene
-        scene.add(bullet);
-        
-        // Store bullet data
-        const bulletData = {
-            mesh: bullet,
-            trail: trail,
-            trailPositions: trailPositions,
-            direction: direction,
-            velocity: direction.clone().multiplyScalar(weapon.bulletSpeed),
-            speed: weapon.bulletSpeed,
-            damage: weapon.damage,
-            distance: 0,
-            maxDistance: 50,
-            createdAt: Date.now(),
-            playerId: data.playerId
-        };
-        
-        // Add to other player bullets map
-        if (!otherPlayerBullets.has(data.playerId)) {
-            otherPlayerBullets.set(data.playerId, []);
-        }
-        otherPlayerBullets.get(data.playerId).push(bulletData);
         
         // Play weapon sound based on weapon type
         switch(data.weapon) {
@@ -1764,7 +1794,7 @@ function updateZombies() {
         
         // Check collision with player
         const distanceToPlayer = zombie.mesh.position.distanceTo(player.position);
-        if (distanceToPlayer < 3 && !isInvincible) {
+        if (distanceToPlayer < 2 && !isInvincible) {
             // Emit player damage event to server
             socket.emit('playerDamage', { damage: zombie.damage });
             health -= zombie.damage;
@@ -2175,7 +2205,7 @@ document.getElementById('welcomeScreen').addEventListener('click', function(even
 });
 
 // Add after other game variables
-const SOCKET_SERVER_URL = 'localhost:3000';
+const SOCKET_SERVER_URL = 'https://0414-2001-8003-1c34-8000-73d2-678f-df1d-119e.ngrok-free.app';
 
 // Add to game variables section
 let isHost = false; // Only one client should spawn zombies
