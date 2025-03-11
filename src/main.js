@@ -1823,7 +1823,7 @@ function updateWaveDisplay() {
         waveDisplay.textContent = 'Waiting for players...';
     } else if (!waveActive && nextWaveTime) {
         const timeLeft = Math.ceil((nextWaveTime - Date.now()) / 1000);
-        waveDisplay.textContent = `Wave ${currentWave} completed! Next wave in ${timeLeft}s`;
+        waveDisplay.textContent = `Wave ${currentWave} completed! Next wave in ${10}s`;
     } else {
         waveDisplay.textContent = `Wave ${currentWave}`;
     }
