@@ -22,6 +22,12 @@ let mouseWorldPosition = new THREE.Vector3();
 let isPaused = false;  // Track game pause state
 let gameStarted = false;  // Track if game has started
 
+// Minimap variables
+let minimapCanvas;
+let minimapCtx;
+const MINIMAP_SIZE = 150;
+const MINIMAP_SCALE = 0.1; // Scale factor to convert world coordinates to minimap coordinates
+
 // Thunder system
 let thunderLight;
 let isThundering = false;
@@ -555,6 +561,48 @@ function initMultiplayer() {
             }, MUZZLE_FLASH_DURATION);
         }
     });
+
+    // Add to initMultiplayer() after other socket event handlers
+    socket.on('playerHit', (data) => {
+        if (!isPvpEnabled) return;
+        
+        // Apply damage
+        health -= data.damage;
+        updateHealthUI();
+        showDamageEffect();
+        
+        // Play hit sound based on weapon
+        switch(data.weapon) {
+            case 'pistol':
+                const hitSound = pistolShotSound.cloneNode();
+                hitSound.volume = 0.3;
+                hitSound.play();
+                break;
+            case 'shotgun':
+                const shotgunHitSound = shotgunShotSound.cloneNode();
+                shotgunHitSound.volume = 0.3;
+                shotgunHitSound.play();
+                break;
+            case 'smg':
+                const smgHitSound = smgShotSound.cloneNode();
+                smgHitSound.volume = 0.3;
+                smgHitSound.play();
+                break;
+        }
+        
+        // Start invincibility frames
+        if (!isInvincible) {
+            isInvincible = true;
+            playerModel.material.transparent = true;
+            playerModel.material.opacity = 0.5;
+            
+            setTimeout(() => {
+                isInvincible = false;
+                playerModel.material.transparent = false;
+                playerModel.material.opacity = 1.0;
+            }, INVINCIBILITY_DURATION);
+        }
+    });
 }
 
 function updateOrCreateOtherPlayer(playerData) {
@@ -883,6 +931,35 @@ function init() {
         animate();
         
         console.log("Game initialized successfully");
+
+        // Create minimap canvas
+        minimapCanvas = document.createElement('canvas');
+        minimapCanvas.width = MINIMAP_SIZE;
+        minimapCanvas.height = MINIMAP_SIZE;
+        minimapCanvas.style.position = 'fixed';
+        minimapCanvas.style.bottom = '240px';  // Position above chat box
+        minimapCanvas.style.right = '20px';
+        minimapCanvas.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+        minimapCanvas.style.borderRadius = '5px';
+        minimapCanvas.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        minimapCanvas.style.zIndex = '1000';
+        document.body.appendChild(minimapCanvas);
+        minimapCtx = minimapCanvas.getContext('2d');
+
+        // Create PVP indicator
+        const pvpIndicator = document.createElement('div');
+        pvpIndicator.id = 'pvpIndicator';
+        pvpIndicator.style.position = 'fixed';
+        pvpIndicator.style.top = '60px';  // Below wave display
+        pvpIndicator.style.left = '50%';
+        pvpIndicator.style.transform = 'translateX(-50%)';
+        pvpIndicator.style.color = '#ff4444';
+        pvpIndicator.style.fontSize = '20px';
+        pvpIndicator.style.fontWeight = 'bold';
+        pvpIndicator.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+        pvpIndicator.style.zIndex = '1000';
+        pvpIndicator.textContent = 'PVP ENABLED';
+        document.body.appendChild(pvpIndicator);
     } catch (error) {
         console.error("Error initializing game:", error);
         document.getElementById('loadingMessage').style.display = 'block';
@@ -1435,11 +1512,46 @@ function updateBullets() {
         // Update distance traveled
         bullet.distance += bullet.velocity.length();
         
+        // Check for collisions with other players if PVP is enabled
+        if (isPvpEnabled) {
+            for (const [playerId, otherPlayer] of otherPlayers) {
+                // Calculate distance between bullet and player center
+                const dx = bullet.mesh.position.x - otherPlayer.position.x;
+                const dz = bullet.mesh.position.z - otherPlayer.position.z;
+                const dy = bullet.mesh.position.y - (otherPlayer.position.y + 1); // Adjust for player height
+                
+                // Calculate the actual distance
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                // Check if bullet hits player (using a smaller collision radius for more precise hits)
+                if (distance < 0.8) {  // Reduced from 1.0 to 0.8 for more precise hits
+                    // Remove bullet
+                    scene.remove(bullet.mesh);
+                    scene.remove(bullet.trail);
+                    bullets.splice(i, 1);
+                    
+                    // Emit hit event to server
+                    socket.emit('playerHit', {
+                        targetId: playerId,
+                        damage: WEAPONS[currentWeapon].damage,
+                        weapon: currentWeapon
+                    });
+                    
+                    // Play hit sound
+                    const hitSound = pistolShotSound.cloneNode();
+                    hitSound.volume = 0.3;
+                    hitSound.play();
+                    
+                    break;
+                }
+            }
+        }
+        
         // Remove bullet if it's gone too far or too old
         if (bullet.distance > bullet.maxDistance || 
             currentTime - bullet.createdAt > BULLET_LIFE_TIME) {
             scene.remove(bullet.mesh);
-            scene.remove(bullet.trail);  // Remove the trail from the scene
+            scene.remove(bullet.trail);
             bullets.splice(i, 1);
         }
     }
@@ -1451,14 +1563,14 @@ function updateBullets() {
             muzzleFlash.visible = false;
         } else {
             const fadeRatio = 1 - (timeSinceFlash / MUZZLE_FLASH_DURATION);
-            muzzleFlash.children[0].intensity = 3 * fadeRatio;  // Light fade
-            muzzleFlash.children[1].material.opacity = fadeRatio;  // Mesh fade
+            muzzleFlash.children[0].intensity = 3 * fadeRatio;
+            muzzleFlash.children[1].material.opacity = fadeRatio;
         }
     }
     
     // Update screen shake
     if (screenShake.trauma > 0) {
-        const shake = screenShake.trauma * screenShake.trauma;  // Quadratic falloff
+        const shake = screenShake.trauma * screenShake.trauma;
         const angle = Math.random() * Math.PI * 2;
         const offsetX = Math.cos(angle) * shake * screenShake.maxOffset;
         const offsetZ = Math.sin(angle) * shake * screenShake.maxOffset;
@@ -1498,6 +1610,39 @@ function updateBullets() {
             
             // Update distance traveled
             bullet.distance += bullet.velocity.length();
+            
+            // Check for collision with local player if PVP is enabled
+            if (isPvpEnabled) {
+                const dx = bullet.mesh.position.x - player.position.x;
+                const dz = bullet.mesh.position.z - player.position.z;
+                const dy = bullet.mesh.position.y - (player.position.y + 1);
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                if (distance < 0.8 && !isInvincible) {
+                    // Remove bullet
+                    scene.remove(bullet.mesh);
+                    scene.remove(bullet.trail);
+                    bullets.splice(i, 1);
+                    
+                    // Apply damage
+                    health -= bullet.damage;
+                    updateHealthUI();
+                    showDamageEffect();
+                    
+                    // Start invincibility frames
+                    isInvincible = true;
+                    playerModel.material.transparent = true;
+                    playerModel.material.opacity = 0.5;
+                    
+                    setTimeout(() => {
+                        isInvincible = false;
+                        playerModel.material.transparent = false;
+                        playerModel.material.opacity = 1.0;
+                    }, INVINCIBILITY_DURATION);
+                    
+                    break;
+                }
+            }
             
             // Remove bullet if it's gone too far or too old
             if (bullet.distance > bullet.maxDistance || 
@@ -1868,6 +2013,7 @@ function animate() {
         updateRain();
         updateZombies();
         updateLooting();
+        drawMinimap(); // Add this line
     }
     
     renderer.render(scene, camera);
@@ -2214,6 +2360,10 @@ const INVINCIBILITY_DURATION = 1000; // 1 second of invincibility after taking d
 
 function handlePlayerDeath() {
     isPaused = true;
+    
+    // Emit disconnect event to server
+    socket.emit('playerDeath');
+    
     const gameOverScreen = document.createElement('div');
     gameOverScreen.id = 'gameOverScreen';
     gameOverScreen.style.position = 'fixed';
@@ -2268,3 +2418,94 @@ function createMuzzleFlashForPlayer() {
     
     return flash;
 }
+
+// Add new function to draw the minimap
+function drawMinimap() {
+    if (!minimapCtx) return;
+
+    // Clear the canvas
+    minimapCtx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+    // Draw game area boundary
+    minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    minimapCtx.lineWidth = 2;
+    minimapCtx.strokeRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+    // Helper function to convert world coordinates to minimap coordinates
+    function worldToMinimap(worldX, worldZ) {
+        // Convert from world space (-150 to 150) to minimap space (0 to MINIMAP_SIZE)
+        return {
+            x: ((worldX + 150) / 300) * MINIMAP_SIZE,
+            z: ((worldZ + 150) / 300) * MINIMAP_SIZE
+        };
+    }
+
+    // Draw environment objects
+    environmentObjects.forEach(obj => {
+        const pos = worldToMinimap(obj.position.x, obj.position.z);
+        const size = (obj.geometry.parameters.width / 300) * MINIMAP_SIZE;
+        
+        minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        minimapCtx.fillRect(pos.x - size/2, pos.z - size/2, size, size);
+    });
+
+    // Draw zombies
+    syncedZombies.forEach(zombie => {
+        const pos = worldToMinimap(zombie.mesh.position.x, zombie.mesh.position.z);
+        
+        minimapCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+        minimapCtx.beginPath();
+        minimapCtx.arc(pos.x, pos.z, 3, 0, Math.PI * 2);
+        minimapCtx.fill();
+    });
+
+    // Draw other players
+    otherPlayers.forEach(otherPlayer => {
+        const pos = worldToMinimap(otherPlayer.position.x, otherPlayer.position.z);
+        
+        minimapCtx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+        minimapCtx.beginPath();
+        minimapCtx.arc(pos.x, pos.z, 3, 0, Math.PI * 2);
+        minimapCtx.fill();
+
+        // Draw direction indicator for other players
+        const angle = otherPlayer.rotation.y;
+        const directionLength = 6;
+        minimapCtx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+        minimapCtx.lineWidth = 2;
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(pos.x, pos.z);
+        minimapCtx.lineTo(
+            pos.x + Math.sin(angle) * directionLength,
+            pos.z + Math.cos(angle) * directionLength
+        );
+        minimapCtx.stroke();
+    });
+
+    // Draw local player
+    if (player) {
+        const pos = worldToMinimap(player.position.x, player.position.z);
+        
+        // Draw player dot
+        minimapCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+        minimapCtx.beginPath();
+        minimapCtx.arc(pos.x, pos.z, 4, 0, Math.PI * 2);
+        minimapCtx.fill();
+
+        // Draw player direction indicator
+        const angle = player.rotation.y;
+        const directionLength = 8;
+        minimapCtx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+        minimapCtx.lineWidth = 2;
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(pos.x, pos.z);
+        minimapCtx.lineTo(
+            pos.x + Math.sin(angle) * directionLength,
+            pos.z + Math.cos(angle) * directionLength
+        );
+        minimapCtx.stroke();
+    }
+}
+
+// Add after other game variables
+let isPvpEnabled = true;  // PVP is enabled by default
