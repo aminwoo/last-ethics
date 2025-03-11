@@ -2351,7 +2351,7 @@ document.getElementById('welcomeScreen').addEventListener('click', function(even
 });
 
 // Add after other game variables
-const SOCKET_SERVER_URL = 'https://a6ebe894a491.ngrok.app';
+const SOCKET_SERVER_URL = 'https://113d2d4267cf.ngrok.app';
 
 // Add to game variables section
 let isHost = false; // Only one client should spawn zombies
