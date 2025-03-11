@@ -408,6 +408,7 @@ function initMultiplayer() {
 
     // Add to initMultiplayer() after other socket event listeners
     socket.on('playerShot', (data) => {
+        console.log('Player shot:', data);
         const otherPlayer = otherPlayers.get(data.playerId);
         if (!otherPlayer) return;
         
@@ -415,10 +416,28 @@ function initMultiplayer() {
         const weapon = WEAPONS[data.weapon];
         if (!weapon) return;
         
-        // Create bullet with trail for other player
-        const bullet = bulletModel.clone();
-        bullet.position.copy(data.position);
-        bullet.position.y = 1.5;
+        // Create bullet
+        const bulletGeometry = new THREE.CylinderGeometry(
+            weapon.bulletSize,
+            weapon.bulletSize,
+            weapon.bulletLength,
+            8
+        );
+        bulletGeometry.rotateX(Math.PI / 2);
+        
+        const bulletMaterial = new THREE.MeshStandardMaterial({
+            color: weapon.color,
+            emissive: weapon.color,
+            emissiveIntensity: 0.5,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        
+        const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+        
+        // Position bullet at the other player's gun position
+        const gunOffset = new THREE.Vector3(0.5, 1.5, 0.2);
+        bullet.position.copy(otherPlayer.position).add(gunOffset);
         
         // Create bullet trail
         const trailGeometry = new THREE.BufferGeometry();
@@ -440,13 +459,13 @@ function initMultiplayer() {
         const trail = new THREE.Line(trailGeometry, trailMaterial);
         scene.add(trail);
         
-        // Set bullet direction
+        // Set bullet direction from the data
         const direction = new THREE.Vector3(data.direction.x, data.direction.y, data.direction.z).normalize();
         
         // Rotate bullet to face direction
         bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
         
-        // Add bullet to scene and tracking array
+        // Add bullet to scene
         scene.add(bullet);
         
         // Store bullet data
@@ -485,7 +504,7 @@ function initMultiplayer() {
             case 'smg':
                 const otherSmgSound = smgShotSound.cloneNode();
                 otherSmgSound.volume = 0.4;
-                otherSmgSound.play();
+                //otherSmgSound.play();
                 break;
         }
         
@@ -1232,6 +1251,10 @@ function shootBullet() {
             break;
     }
     
+    // Calculate initial direction to mouse position (before spread)
+    const initialDirection = new THREE.Vector3();
+    initialDirection.subVectors(mouseWorldPosition, player.position).normalize();
+    
     // Fire multiple bullets for shotgun
     for (let i = 0; i < weapon.bulletsPerShot; i++) {
         // Create bullet with trail
@@ -1269,26 +1292,25 @@ function shootBullet() {
         const trail = new THREE.Line(trailGeometry, trailMaterial);
         scene.add(trail);
         
-        // Calculate direction to mouse position with weapon-specific spread
-        const direction = new THREE.Vector3();
-        direction.subVectors(mouseWorldPosition, player.position).normalize();
-
+        // Calculate direction with spread
+        const bulletDirection = initialDirection.clone();
+        
         // Apply spread based on weapon type
         if (weapon.name === "Shotgun") {
             // Conical spread pattern
             const spreadAngle = weapon.spread * (1 - (i / weapon.bulletsPerShot)); // Tighter spread for center pellets
-            direction.x += (Math.random() - 0.5) * spreadAngle;
-            direction.y += (Math.random() - 0.5) * spreadAngle * 0.5; // Less vertical spread
-            direction.z += (Math.random() - 0.5) * spreadAngle;
+            bulletDirection.x += (Math.random() - 0.5) * spreadAngle;
+            bulletDirection.y += (Math.random() - 0.5) * spreadAngle * 0.5; // Less vertical spread
+            bulletDirection.z += (Math.random() - 0.5) * spreadAngle;
         } else {
-            direction.x += (Math.random() - 0.5) * weapon.spread;
-            direction.y += (Math.random() - 0.5) * weapon.spread;
-            direction.z += (Math.random() - 0.5) * weapon.spread;
+            bulletDirection.x += (Math.random() - 0.5) * weapon.spread;
+            bulletDirection.y += (Math.random() - 0.5) * weapon.spread;
+            bulletDirection.z += (Math.random() - 0.5) * weapon.spread;
         }
-        direction.normalize();
+        bulletDirection.normalize();
         
         // Rotate bullet to face direction
-        bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+        bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), bulletDirection);
         
         // Add bullet to scene and tracking array
         scene.add(bullet);
@@ -1296,8 +1318,8 @@ function shootBullet() {
             mesh: bullet,
             trail: trail,
             trailPositions: trailPositions,
-            direction: direction,
-            velocity: direction.clone().multiplyScalar(
+            direction: bulletDirection,
+            velocity: bulletDirection.clone().multiplyScalar(
                 weapon.name === "Shotgun" 
                     ? weapon.bulletSpeed * (0.7 + Math.random() * 0.3) // Reduced speed variation from 0.8-1.2 to 0.7-1.0
                     : weapon.bulletSpeed
@@ -1333,15 +1355,19 @@ function shootBullet() {
         reload();
     }
 
-    // Emit shooting event to server
+    // Emit shooting event to server using the initial direction
     socket.emit('playerShooting', {
         shooting: true,
         position: {
-            x: bullet.position.x,
-            y: bullet.position.y,
-            z: bullet.position.z
+            x: player.position.x,
+            y: player.position.y,
+            z: player.position.z
         },
-        direction: direction,
+        direction: {
+            x: initialDirection.x,
+            y: initialDirection.y,
+            z: initialDirection.z
+        },
         weapon: currentWeapon
     });
 }
@@ -2149,7 +2175,7 @@ document.getElementById('welcomeScreen').addEventListener('click', function(even
 });
 
 // Add after other game variables
-const SOCKET_SERVER_URL = 'https://24b2-2001-8003-1c34-8000-73d2-678f-df1d-119e.ngrok-free.app';
+const SOCKET_SERVER_URL = 'localhost:3000';
 
 // Add to game variables section
 let isHost = false; // Only one client should spawn zombies
