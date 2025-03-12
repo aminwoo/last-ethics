@@ -203,6 +203,17 @@ let labelRenderer;
 let chatSocket;
 let otherPlayerBullets = new Map(); // Map to store other players' bullets
 
+// Add after other game variables
+let isChatFocused = false;
+
+// Add to game variables
+let isPvpEnabled = true;  // PVP is enabled by default
+
+// Add to game variables section
+let isHost = false; // Only one client should spawn zombies
+let isInvincible = false;
+const INVINCIBILITY_DURATION = 1000; // 1 second of invincibility after taking damage
+
 // Add after init() but before startGame()
 function initMultiplayer() {
     socket = io(SOCKET_SERVER_URL, {
@@ -239,8 +250,10 @@ function initMultiplayer() {
             // Send message to other players
             chatSocket.emit('send-message', message, time);
             
-            // Clear input
+            // Clear input and unfocus
             chatInput.value = '';
+            chatInput.blur();
+            isChatFocused = false;
         }
     });
 
@@ -960,6 +973,49 @@ function init() {
         pvpIndicator.style.zIndex = '1000';
         pvpIndicator.textContent = 'PVP ENABLED';
         document.body.appendChild(pvpIndicator);
+
+        // Add chat input event listeners
+        const chatInput = document.getElementById('chat-input');
+        
+        chatInput.addEventListener('focus', () => {
+            isChatFocused = true;
+        });
+
+        chatInput.addEventListener('blur', () => {
+            isChatFocused = false;
+        });
+
+        chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                if (chatInput.value.trim()) {
+                    const message = chatInput.value.trim();
+                    const time = new Date().toLocaleTimeString();
+                    
+                    // Add own message to chat
+                    addChatMessage(playerName, message, time);
+                    
+                    // Send message to other players
+                    chatSocket.emit('send-message', message, time);
+                }
+                
+                // Clear input and unfocus
+                chatInput.value = '';
+                chatInput.blur();
+                isChatFocused = false;
+                event.preventDefault();
+                
+                // Return focus to the game
+                document.body.focus();
+            } else if (event.key === 'Escape') {
+                // Allow escaping from chat input
+                chatInput.blur();
+                isChatFocused = false;
+                event.preventDefault();
+                
+                // Return focus to the game
+                document.body.focus();
+            }
+        });
     } catch (error) {
         console.error("Error initializing game:", error);
         document.getElementById('loadingMessage').style.display = 'block';
@@ -1095,62 +1151,84 @@ function createPlayer() {
 }
 
 function onKeyDown(event) {
-    keysPressed[event.key.toLowerCase()] = true;
-    
-    // Handle Escape key for pause
-    if (event.key === 'Escape') {
-        togglePause();
-        return;
+    // Handle Enter key to focus/unfocus chat
+    if (event.key === 'Enter') {
+        if (!isChatFocused) {
+            // Focus chat input
+            event.preventDefault();
+            document.getElementById('chat-input').focus();
+            isChatFocused = true;
+            return;
+        }
     }
-    
-    // Only process other keys if game is not paused
-    if (!isPaused) {
-        // Weapon switching
-        if (event.key === '1') switchWeapon('pistol');
-        if (event.key === '2') switchWeapon('shotgun');
-        if (event.key === '3') switchWeapon('smg');
+
+    // Only process game controls if chat is not focused
+    if (!isChatFocused) {
+        keysPressed[event.key.toLowerCase()] = true;
         
-        // Reload
-        if (event.key.toLowerCase() === 'r' && !isReloading && currentAmmo < maxAmmo) {
-            reload();
+        // Handle Escape key for pause
+        if (event.key === 'Escape') {
+            togglePause();
+            return;
         }
         
-        // Toggle flashlight
-        if (event.key.toLowerCase() === 'f') {
-            isFlashlightOn = !isFlashlightOn;
-            flashlight.visible = isFlashlightOn;
+        // Only process other keys if game is not paused
+        if (!isPaused) {
+            // Weapon switching
+            if (event.key === '1') switchWeapon('pistol');
+            if (event.key === '2') switchWeapon('shotgun');
+            if (event.key === '3') switchWeapon('smg');
+            
+            // Reload
+            if (event.key.toLowerCase() === 'r' && !isReloading && currentAmmo < maxAmmo) {
+                reload();
+            }
+            
+            // Toggle flashlight
+            if (event.key.toLowerCase() === 'f') {
+                isFlashlightOn = !isFlashlightOn;
+                flashlight.visible = isFlashlightOn;
+            }
         }
     }
 }
 
 function onKeyUp(event) {
-    keysPressed[event.key.toLowerCase()] = false;
+    // Only process game controls if chat is not focused
+    if (!isChatFocused) {
+        keysPressed[event.key.toLowerCase()] = false;
+    }
 }
 
 function onMouseMove(event) {
-    // Calculate mouse position in normalized device coordinates
-    mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    // Update client mouse position for crosshair
-    clientMousePosition.x = event.clientX;
-    clientMousePosition.y = event.clientY;
-    
-    // Update crosshair position
-    const crosshair = document.getElementById('crosshair');
-    crosshair.style.left = clientMousePosition.x + 'px';
-    crosshair.style.top = clientMousePosition.y + 'px';
+    // Only process mouse movement if chat is not focused
+    if (!isChatFocused) {
+        // Calculate mouse position in normalized device coordinates
+        mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        // Update client mouse position for crosshair
+        clientMousePosition.x = event.clientX;
+        clientMousePosition.y = event.clientY;
+        
+        // Update crosshair position
+        const crosshair = document.getElementById('crosshair');
+        crosshair.style.left = clientMousePosition.x + 'px';
+        crosshair.style.top = clientMousePosition.y + 'px';
+    }
 }
 
 function onMouseDown(event) {
-    if (event.button === 0) { // Left click
+    // Only process mouse clicks if chat is not focused
+    if (!isChatFocused && event.button === 0) {
         isMouseDown = true;
         shootBullet();
     }
 }
 
 function onMouseUp(event) {
-    if (event.button === 0) { // Left click
+    // Only process mouse release if chat is not focused
+    if (!isChatFocused && event.button === 0) {
         isMouseDown = false;
         // Stop SMG sound when mouse is released
         if (currentWeapon === 'smg' && isSmgFiring) {
@@ -1784,6 +1862,11 @@ function createThunderStrike() {
     if (isThundering) return;
     isThundering = true;
     
+    // Play thunder sound
+    const thunderClap = new Audio('/assets/sounds/thunder-307513.mp3');
+    thunderClap.volume = 0.2;
+    thunderClap.play();
+    
     // Random intensity for variation (very bright!)
     const intensity = 3 + Math.random() * 2;
     
@@ -2351,12 +2434,7 @@ document.getElementById('welcomeScreen').addEventListener('click', function(even
 });
 
 // Add after other game variables
-const SOCKET_SERVER_URL = 'https://113d2d4267cf.ngrok.app';
-
-// Add to game variables section
-let isHost = false; // Only one client should spawn zombies
-let isInvincible = false;
-const INVINCIBILITY_DURATION = 1000; // 1 second of invincibility after taking damage
+const SOCKET_SERVER_URL = 'localhost:3000';
 
 function handlePlayerDeath() {
     isPaused = true;
@@ -2368,8 +2446,6 @@ function handlePlayerDeath() {
     gameOverScreen.id = 'gameOverScreen';
     gameOverScreen.style.position = 'fixed';
     gameOverScreen.style.top = '0';
-    gameOverScreen.style.left = '0';
-    gameOverScreen.style.width = '100%';
     gameOverScreen.style.height = '100%';
     gameOverScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
     gameOverScreen.style.display = 'flex';
@@ -2506,6 +2582,3 @@ function drawMinimap() {
         minimapCtx.stroke();
     }
 }
-
-// Add after other game variables
-let isPvpEnabled = true;  // PVP is enabled by default
