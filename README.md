@@ -1,13 +1,12 @@
 # Last Ethics - Atmospheric Shooter
 
-A browser-based 3D zombie survival shooter game built with Three.js. Fight through endless waves of zombies in a dark, atmospheric environment while managing your resources and surviving as long as possible.
+A browser-based 3D zombie survival top-down shooter game built with Three.js. Fight through endless waves of zombies in a dark, atmospheric environment while managing your resources and surviving as long as possible.
 
 ## Features
 
-- Three different weapons: Pistol, Shotgun, and SMG
+- Five different weapons: Chainsaw, Pistol, Shotgun, Grenade launcher, and SMG
 - Dynamic weapon switching and reloading system
 - Atmospheric effects including rain and thunder
-- Wave-based zombie spawning with increasing difficulty
 - Resource management (ammo, health, stamina)
 - Lootable bodies from defeated zombies
 - Environmental obstacles for tactical gameplay
@@ -22,25 +21,6 @@ A browser-based 3D zombie survival shooter game built with Three.js. Fight throu
 - R - Reload
 - 1,2,3 - Switch Weapons
 - ESC - Pause Game
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/last-ethics.git
-cd last-ethics
-```
-
-2. Start a local server (you can use Python's built-in server):
-```bash
-python -m http.server
-```
-
-3. Open your browser and navigate to `http://localhost:8000`
-
-## Dependencies
-
-- Three.js (r128) - Loaded via CDN
 
 ## Project Structure
 
