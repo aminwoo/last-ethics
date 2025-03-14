@@ -1,0 +1,13 @@
+#crosshair {
+    position: fixed;
+    width: 32px;  
+    height: 32px; 
+    z-index: 100;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    background-image: url('/images/crosshair.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+}
