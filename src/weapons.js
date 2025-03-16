@@ -1162,8 +1162,11 @@ export function updateBullets(scene, zombies = []) {
             
             for (let j = 0; j < zombies.length; j++) {
                 const zombie = zombies[j];
-                // Skip if zombie is not valid or already dead
-                if (!zombie || !zombie.position || (zombie.health !== undefined && zombie.health <= 0)) continue;
+                // Skip if zombie is not valid or already dead/dying
+                if (!zombie || !zombie.position || 
+                    (zombie.userData && (zombie.userData.isDead))) {
+                    continue;
+                }
                 
                 // Simple distance-based collision detection
                 const zombiePos = zombie.position.clone();
@@ -1187,34 +1190,43 @@ export function updateBullets(scene, zombies = []) {
                     // Create blood impact effect
                     createBulletImpact(impactPos, scene, 'zombie');
                     
-                    // Apply damage to zombie
+                    // Calculate knockback force based on bullet damage and type
+                    const knockbackAmount = bullet.damage * (bullet.weaponType === 'Shotgun' ? 0.1 : 0.5);
+                    
+                    // Apply damage to zombie with the direction for knockback
+                    let damageApplied = false;
+                    
                     if (typeof zombie.takeDamage === 'function') {
-                        zombie.takeDamage(bullet.damage);
-                        console.log(`Zombie hit! Damage: ${bullet.damage}`);
+                        // Call with bullet direction for knockback and damage
+                        zombie.takeDamage(bullet.damage, bullet.direction, knockbackAmount);
+                        damageApplied = true;
                     } else if (zombie.userData && typeof zombie.userData.takeDamage === 'function') {
-                        zombie.userData.takeDamage(bullet.damage);
-                        console.log(`Zombie hit! Damage: ${bullet.damage}`);
+                        // Fall back to userData.takeDamage
+                        zombie.userData.takeDamage(bullet.damage, bullet.direction, knockbackAmount);
+                        damageApplied = true;
+                    } else if (zombie.userData && typeof zombie.userData.onHit === 'function') {
+                        // Fall back to legacy onHit method
+                        zombie.userData.onHit(bullet.damage);
+                        damageApplied = true;
+                        
+                        // Apply knockback separately for legacy method
+                        if (zombie.userData.knockback) {
+                            const knockbackForce = bullet.direction.clone().multiplyScalar(
+                                bullet.damage * 0.02 * (bullet.weaponType === 'Shotgun' ? 0.1 : 0.5)
+                            );
+                            zombie.userData.knockback.velocity.copy(knockbackForce);
+                            zombie.userData.knockback.active = true;
+                        }
                     } else if (zombie.health !== undefined) {
-                        // Direct health modification if no takeDamage function exists
+                        // Direct health modification if no functions exist
                         zombie.health -= bullet.damage;
-                        console.log(`Zombie hit! Health reduced to: ${zombie.health}`);
+                        damageApplied = true;
                     } else {
                         console.warn("Zombie hit but no way to apply damage was found");
                     }
                     
-                    // Apply knockback force to the zombie
-                    if (zombie.userData && zombie.userData.knockback) {
-                        // Calculate knockback force based on bullet direction and damage
-                        const knockbackForce = bullet.direction.clone().multiplyScalar(
-                            // Scale knockback by damage and weapon type
-                            bullet.damage * 0.02 * (bullet.weaponType === 'Shotgun' ? 0.1 : 0.5)
-                        );
-                        
-                        // Apply knockback velocity to zombie
-                        zombie.userData.knockback.velocity.copy(knockbackForce);
-                        zombie.userData.knockback.active = true;
-                        
-                        console.log(`Applied knockback to zombie: ${knockbackForce.length().toFixed(2)}`);
+                    if (damageApplied) {
+                        console.log(`Zombie hit! Damage: ${bullet.damage}, Knockback: ${knockbackAmount.toFixed(2)}`);
                     }
                     
                     break; // A bullet can only hit one zombie
