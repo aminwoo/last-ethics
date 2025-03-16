@@ -3,15 +3,54 @@
 	<head>
 		<meta charset="utf-8">
 		<title>Zombie Top-Down Shooter</title>
-		<style>
-			body { margin: 0; }
-		</style>
-		<link rel="stylesheet" href="/css/style.css">
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="/css/game-ui.css">
 	</head>
 	<body>
-		<div id="gameContainer">
+		<div id="gameContainer"></div>
+		
+		<div id="ui-container">
+			<div id="instructions">
+				<h3>Last Ethics</h3>
+				<p>WASD - Move</p>
+				<p>Shift - Sprint</p>
+				<p>Left Click - Shoot</p>
+				<p>R - Reload</p>
+				<p>F - Toggle Flashlight</p>
+				<p>1-4 - Change Weapon</p>
+			</div>
+			<div id="status-panel">
+				<div class="status-container">
+					<div class="status-label">HEALTH</div>
+					<div class="bar-container">
+						<div id="health-bar" class="bar"></div>
+						<div id="health-text">100%</div>
+					</div>
+				</div>
+				
+				<div class="status-container">
+					<div class="status-label">STAMINA</div>
+					<div class="bar-container stamina-bar-container">
+						<div id="stamina-bar" class="bar"></div>
+					</div>
+				</div>
+			</div>
+			
+			<div id="weapon-panel">
+				<div id="weapon-image-container">
+					<img id="weapon-image" src="/images/GUN_01_[square_frame]_01_V1.00.png" alt="Current Weapon">
+				</div>
+				<div id="weapon-info">
+					<div id="weapon-name">Pistol</div>
+					<div id="ammo-counter">12 / 48</div>
+				</div>
+			</div>
+			
 			<div id="crosshair"></div>
 		</div>
+		
 		<script type="module" src="/src/main.js"></script>
 	</body>
 </html>

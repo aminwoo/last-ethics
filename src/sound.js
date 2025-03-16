@@ -28,19 +28,19 @@ const masterVolume = {
 // Sound definitions with metadata
 const SOUNDS = {
   // Weapon sounds
-  PISTOL: {
+  PISTOL_SHOT: {
     url: '/sounds/pistol.mp3',
-    volume: 1.0,
+    volume: 0.7,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
-  SHOTGUN: {
+  SHOTGUN_SHOT: {
     url: '/sounds/shotgun.mp3',
     volume: 0.8,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
-  SMG: {
+  SMG_SHOT: {
     url: '/sounds/smg.mp3',
     volume: 1.0,
     category: SOUND_CATEGORIES.WEAPONS,
@@ -59,19 +59,28 @@ const SOUNDS = {
     category: SOUND_CATEGORIES.PLAYER,
     loop: false
   },
-  
-  // Ambient sounds
+  EMPTY_CLIP: {
+    url: '/sounds/empty_clip.wav',
+    volume: 1.0,
+    category: SOUND_CATEGORIES.WEAPONS,
+    loop: false
+  },
+
+  THUNDER: {
+    url: '/sounds/thunder.mp3',
+    volume: 0.3,
+    category: SOUND_CATEGORIES.AMBIENT,
+    loop: false
+  },
   RAIN: {
     url: '/sounds/rain.wav',
     volume: 0.7,
     category: SOUND_CATEGORIES.AMBIENT,
     loop: true,
-    useWebAudio: true, // Use WebAudio API for advanced looping
+    useWebAudio: true,
     loopStart: 0.0,
     crossfadeDuration: 0.5
-  }
-  
-  // Add more sounds as needed
+  },
 };
 
 // Storage for loaded sounds
@@ -366,17 +375,19 @@ const SoundManager = {
   setMasterVolume,
   
   // Weapon sound shortcuts
-  playPistolShot: () => playSound('PISTOL', { resetTime: true }),
-  playShotgunShot: () => playSound('SHOTGUN', { resetTime: true }),
-  playSmgShot: () => playSound('SMG', { resetTime: true }),
+  playPistolShot: () => playSound('PISTOL_SHOT', { resetTime: true }),
+  playShotgunShot: () => playSound('SHOTGUN_SHOT', { resetTime: true }),
+  playSmgShot: () => playSound('SMG_SHOT', { resetTime: true }),
   playReload: () => playSound('RELOAD', { resetTime: true }),
-
+  playEmptyClip: () => playSound('EMPTY_CLIP', { resetTime: true }),
+  
   // Player sound shortcuts
   playHurt: () => playSound('HURT', { resetTime: true }),
   
   // Ambient sound shortcuts
   playRainAmbience: () => playSound('RAIN'),
-  
+  playThunder: () => playSound('THUNDER'),
+
   // Categories for volume control
   categories: SOUND_CATEGORIES
 };
