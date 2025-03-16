@@ -86,6 +86,23 @@ export const weapons = [
 
 let bullets = [];
 
+// Reset bullets array - add this function to clear bullets on restart
+export function resetBullets(scene) {
+    // Remove all bullets from the scene and clear the array
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const bullet = bullets[i];
+        // Clean up references to avoid memory leaks
+        scene.remove(bullet.mesh);
+        scene.remove(bullet.trail);
+        if (bullet.light) {
+            scene.remove(bullet.light);
+        }
+    }
+    // Reset the array
+    bullets = [];
+    console.log("Bullets array reset");
+}
+
 // Create bullet model (for reuse)
 let bulletModel;
 function initBulletModel() {
