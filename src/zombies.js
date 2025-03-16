@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { recordZombieKill, gameState, setPlayerInvulnerable, isPlayerInvulnerable, gameOver } from './gameState.js';
+import { recordZombieKill, gameState, setPlayerInvulnerable, isPlayerInvulnerable, gameOver, getWaveDifficultyScaling, getWaveComposition } from './gameState.js';
 import SoundManager from './sound.js';
 import { showDamageFlash } from './effects.js';
 
@@ -15,8 +15,8 @@ const ZOMBIE_TYPES = {
         size: { width: 0.8, height: 1.8, depth: 0.5 }
     },
     RUNNER: {
-        speed: 0.03,
-        health: 60,
+        speed: 0.04,
+        health: 80,
         damage: 15,
         color: 0x8FBC8F, // Light green
         attackRange: 1.2,
@@ -24,8 +24,8 @@ const ZOMBIE_TYPES = {
         size: { width: 0.7, height: 1.6, depth: 0.4 }
     },
     BRUTE: {
-        speed: 0.01,
-        health: 200,
+        speed: 0.03,
+        health: 300,
         damage: 35,
         color: 0x006400, // Dark green
         attackRange: 1.8,
@@ -42,9 +42,12 @@ export function getZombies() {
     return zombies;
 }
 
-// Create a zombie and add it to the scene
+// Create a zombie and add it to the scene with difficulty scaling based on current wave
 export function createZombie(scene, position, type = 'REGULAR', playerRef) {
     const zombieType = ZOMBIE_TYPES[type];
+    
+    // Apply wave difficulty scaling
+    const difficultyScaling = getWaveDifficultyScaling();
     
     // Create zombie group
     const zombie = new THREE.Group();
@@ -52,10 +55,10 @@ export function createZombie(scene, position, type = 'REGULAR', playerRef) {
     zombie.userData = {
         type: 'enemy', // For bullet collision detection
         zombieType: type, // Store the zombie type
-        health: zombieType.health,
-        maxHealth: zombieType.health,
-        speed: zombieType.speed,
-        damage: zombieType.damage,
+        health: Math.round(zombieType.health * difficultyScaling.health),
+        maxHealth: Math.round(zombieType.health * difficultyScaling.health),
+        speed: zombieType.speed * difficultyScaling.speed,
+        damage: Math.round(zombieType.damage * difficultyScaling.damage),
         attackRange: zombieType.attackRange,
         attackSpeed: zombieType.attackSpeed,
         lastAttackTime: 0,
@@ -1057,7 +1060,7 @@ function animateZombieDying(zombie, progress) {
     }
 }
 
-// Create multiple zombies in a group/horde
+// Create multiple zombies in a group/horde with wave-appropriate composition
 export function spawnZombieHorde(scene, centerPosition, count, player) {
     const zombies = [];
     const spawnPositions = [];
@@ -1121,15 +1124,22 @@ export function spawnZombieHorde(scene, centerPosition, count, player) {
         finalPositions.push(new THREE.Vector3(x, 0, z));
     }
     
+    // Get wave composition for zombie types
+    const waveComposition = getWaveComposition();
+    
     // Now spawn zombies at the final positions
     for (let i = 0; i < count; i++) {
-        // More common zombies, less runners and brutes
-        let type = 'REGULAR';
+        // Determine zombie type based on wave composition
         const typeRoll = Math.random();
-        if (typeRoll > 0.8) {
-            type = 'RUNNER';
-        } else if (typeRoll > 0.95) {
-            type = 'BRUTE';
+        let type = 'REGULAR';
+        let cumulativeProbability = 0;
+        
+        for (const [zombieType, probability] of Object.entries(waveComposition)) {
+            cumulativeProbability += probability;
+            if (typeRoll <= cumulativeProbability) {
+                type = zombieType;
+                break;
+            }
         }
         
         // Create zombie at position
@@ -1138,6 +1148,28 @@ export function spawnZombieHorde(scene, centerPosition, count, player) {
     }
     
     return zombies;
+}
+
+// Generate random spawn points around the player at a safe distance
+export function generateSpawnPointsAroundPlayer(player, minDistance, maxDistance, count) {
+    const spawnPoints = [];
+    const playerPos = player.position.clone();
+    
+    for (let i = 0; i < count; i++) {
+        // Generate random angle
+        const angle = Math.random() * Math.PI * 2;
+        
+        // Generate random distance between min and max
+        const distance = minDistance + Math.random() * (maxDistance - minDistance);
+        
+        // Calculate position
+        const x = playerPos.x + Math.cos(angle) * distance;
+        const z = playerPos.z + Math.sin(angle) * distance;
+        
+        spawnPoints.push(new THREE.Vector3(x, 0, z));
+    }
+    
+    return spawnPoints;
 }
 
 // Remove dead zombies (optionally with delay after death animation)
