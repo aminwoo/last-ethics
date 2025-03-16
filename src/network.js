@@ -217,11 +217,26 @@ function initializeNetworking(playerUpdatedCallback, scene) {
     // Create debug display
     createDebugDisplay();
     
-    // Use current host with different port for WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname || 'localhost';
-    const port = 3000; // Match the server port
-    const wsUrl = 'https://last-ethics-server.onrender.com'; // `${protocol}//${host}:${port}`;
+    // Determine whether to use local or production WebSocket URL
+    // Check if we're on localhost or a real domain
+    const isLocalhost = 
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '';
+    
+    let wsUrl;
+    if (isLocalhost) {
+        // Local development - use local WebSocket server
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = 'localhost';
+        const port = 3000; // Match the local server port
+        wsUrl = `${protocol}//${host}:${port}`;
+        console.log('Using local WebSocket server');
+    } else {
+        // Production environment - use deployed server
+        wsUrl = 'wss://last-ethics-server.onrender.com';
+        console.log('Using production WebSocket server');
+    }
     
     console.log(`Attempting to connect to WebSocket server at: ${wsUrl}`);
     
@@ -373,6 +388,11 @@ function handleServerMessage(messageData, scene) {
             case 'playerLeft':
                 console.log(`Player ${message.id} left`);
                 removeRemotePlayer(message.id, scene);
+                break;
+                
+            case 'playerDied':
+                console.log(`Player ${message.playerId} died`);
+                handleRemotePlayerDeath(message.playerId, message.playerName, scene);
                 break;
                 
             default:
@@ -1090,6 +1110,132 @@ function playRemotePlayerWeaponSound(weaponType) {
     }
 }
 
+/**
+ * Send a notification to all players that the local player has died
+ */
+function sendPlayerDeathEvent() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        console.warn('Cannot send player death event: WebSocket not connected');
+        return false;
+    }
+    
+    console.log('Sending player death event to server');
+    
+    socket.send(JSON.stringify({
+        type: 'playerDeath'
+    }));
+    
+    return true;
+}
+
+/**
+ * Handle a remote player death event
+ * @param {number} deadPlayerId - ID of the player who died
+ * @param {string} playerName - Name of the player who died
+ * @param {THREE.Scene} scene - The game scene
+ */
+function handleRemotePlayerDeath(deadPlayerId, playerName, scene) {
+    console.log(`Remote player ${deadPlayerId} (${playerName}) died`);
+    
+    // Get the player object
+    const deadPlayer = remotePlayers.get(deadPlayerId);
+    if (!deadPlayer) {
+        console.warn(`Player ${deadPlayerId} not found in remotePlayers map`);
+        return;
+    }
+    
+    // Create a death effect at the player's position
+    createPlayerDeathEffect(deadPlayer.position, scene);
+    
+    // Remove the player from the scene
+    removeRemotePlayer(deadPlayerId, scene);
+}
+
+/**
+ * Create visual effect for player death
+ * @param {THREE.Vector3} position - Position where the player died
+ * @param {THREE.Scene} scene - The game scene
+ */
+function createPlayerDeathEffect(position, scene) {
+    // Create particle effect
+    const particleCount = 50;
+    const particles = new THREE.Group();
+    
+    // Create particles in different colors
+    const colors = [0xff0000, 0xdd0000, 0xaa0000]; // Different shades of red
+    
+    for (let i = 0; i < particleCount; i++) {
+        const size = 0.1 + Math.random() * 0.3;
+        const geometry = new THREE.SphereGeometry(size, 4, 4);
+        const material = new THREE.MeshBasicMaterial({
+            color: colors[Math.floor(Math.random() * colors.length)],
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const particle = new THREE.Mesh(geometry, material);
+        
+        // Position slightly above ground
+        particle.position.set(
+            position.x + (Math.random() * 2 - 1) * 2,
+            position.y + 1 + Math.random() * 2,
+            position.z + (Math.random() * 2 - 1) * 2
+        );
+        
+        // Add random velocity
+        particle.userData.velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.3,
+            Math.random() * 0.4,
+            (Math.random() - 0.5) * 0.3
+        );
+        
+        particles.add(particle);
+    }
+    
+    // Add particles to scene
+    scene.add(particles);
+    
+    // Animate particles
+    const startTime = Date.now();
+    const duration = 2000; // 2 seconds
+    
+    function animateParticles() {
+        const elapsedTime = Date.now() - startTime;
+        if (elapsedTime > duration) {
+            // Animation complete, remove particles
+            scene.remove(particles);
+            return;
+        }
+        
+        // Update particle positions based on velocity and gravity
+        particles.children.forEach(particle => {
+            particle.position.add(particle.userData.velocity);
+            particle.userData.velocity.y -= 0.01; // Gravity
+            
+            // Fade out over time
+            const opacity = 0.8 * (1 - elapsedTime / duration);
+            particle.material.opacity = opacity;
+        });
+        
+        // Continue animation
+        requestAnimationFrame(animateParticles);
+    }
+    
+    // Start animation
+    animateParticles();
+    
+    // Add a flash of light at the death position
+    const flash = new THREE.PointLight(0xff4444, 5, 10);
+    flash.position.copy(position);
+    flash.position.y += 1;
+    scene.add(flash);
+    
+    // Remove the flash after a short time
+    setTimeout(() => {
+        scene.remove(flash);
+    }, 300);
+}
+
 export {
     initializeNetworking,
     sendPlayerUpdate,
@@ -1103,5 +1249,6 @@ export {
     sendChatMessage,
     createPlayerNameTag,
     createRemotePlayerFlashlight,
-    updateRemotePlayerFlashlight
+    updateRemotePlayerFlashlight,
+    sendPlayerDeathEvent
 }; 
