@@ -1,6 +1,7 @@
 // Game state management
 import { weapons, switchWeapon, reloadWeapon, checkReloadCompletion } from './weapons.js';
 import SoundManager from './sound.js';
+import { sendPlayerDeathEvent } from './network.js';
 
 // Score values for different zombie types
 export const SCORE_VALUES = {
@@ -110,6 +111,11 @@ export function gameOver() {
     
     gameState.isGameOver = true;
     gameState.gameEndTime = Date.now();
+    
+    // Send death event to other players (if in multiplayer)
+    if (window.playerId) {
+        sendPlayerDeathEvent();
+    }
     
     // Calculate survival time in seconds
     const survivalTimeInSeconds = Math.floor((gameState.gameEndTime - gameState.gameStartTime) / 1000);
