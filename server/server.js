@@ -55,7 +55,9 @@ wss.on('connection', (ws, req) => {
         rotation: { x: 0, y: 0, z: 0 },
         isInitializing: true, // Flag to indicate player hasn't sent position yet
         ip: ip, // Store the IP for debugging
-        name: `Player ${playerId}` // Default name
+        name: `Player ${playerId}`, // Default name
+        isFiring: false,
+        weaponType: null
     });
     
     console.log(`Player ${playerId} connected. Total players: ${clients.size}`);
@@ -70,7 +72,9 @@ wss.on('connection', (ws, req) => {
                 id: p.id, 
                 position: p.position, 
                 rotation: p.rotation,
-                name: p.name || `Player ${p.id}`
+                name: p.name || `Player ${p.id}`,
+                isFiring: p.isFiring || false,
+                weaponType: p.weaponType || null
             })) // Only send players who have real positions and only send necessary data
     }));
     
@@ -111,6 +115,15 @@ wss.on('connection', (ws, req) => {
                             // Update player data
                             player.position = data.position;
                             player.rotation = data.rotation;
+                            
+                            // Handle weapon firing data
+                            player.isFiring = data.isFiring || false;
+                            player.weaponType = data.weaponType || null;
+                            
+                            // If player is firing, log it
+                            if (player.isFiring) {
+                                console.log(`Player ${playerId} firing weapon: ${player.weaponType}`);
+                            }
                             
                             if (isFirstUpdate) {
                                 // Remove initializing flag

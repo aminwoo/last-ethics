@@ -25,7 +25,9 @@ import {
     handleReload,
     handleShooting,
     updateBullets,
-    resetBullets
+    resetBullets,
+    getBulletModel,
+    addRemoteBullet
 } from './weapons.js';
 import { updateScreenShake } from './effects.js';
 import * as ZombieSystem from './zombies.js';
@@ -247,6 +249,10 @@ async function initializeGame() {
 
     // Make gameState available globally for network code
     window.gameState = gameState;
+    
+    // Make bullet-related functions available globally for network code
+    window.getBulletModel = getBulletModel;
+    window.addRemoteBullet = addRemoteBullet;
 
     // Initialize multiplayer networking
     try {
@@ -254,6 +260,9 @@ async function initializeGame() {
             updateMultiplayerStatus(playerCount);
         }, scene);
         console.log('Networking initialized successfully');
+        
+        // Make sendPlayerUpdate available globally for weapon firing updates
+        window.sendPlayerUpdate = sendPlayerUpdate;
         
         // Send player name to the server
         if (gameState.playerName) {
@@ -533,7 +542,9 @@ function updatePlayerAndFlashlight(deltaTime) {
         (gameState.frameCount % 6 === 0);  // Every 6 frames after that
     
     if (shouldSendUpdate) {
-        sendPlayerUpdate(player);
+        // For normal position updates, explicitly set isFiring to false
+        // Weapon firing updates are sent separately in handleShooting
+        sendPlayerUpdate(player, false, gameState.weapon ? gameState.weapon.name : null);
     }
     
     // Update flashlight

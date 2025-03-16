@@ -86,23 +86,6 @@ export const weapons = [
 
 let bullets = [];
 
-// Reset bullets array - add this function to clear bullets on restart
-export function resetBullets(scene) {
-    // Remove all bullets from the scene and clear the array
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        const bullet = bullets[i];
-        // Clean up references to avoid memory leaks
-        scene.remove(bullet.mesh);
-        scene.remove(bullet.trail);
-        if (bullet.light) {
-            scene.remove(bullet.light);
-        }
-    }
-    // Reset the array
-    bullets = [];
-    console.log("Bullets array reset");
-}
-
 // Create bullet model (for reuse)
 let bulletModel;
 function initBulletModel() {
@@ -131,6 +114,9 @@ let lastMuzzleFlashTime = 0;
 
 // Store active bullets
 const activeBullets = [];
+
+// Create a separate array for remote player bullets
+const remotePlayerBullets = [];
 
 // Constants for bullet management
 const BULLET_TRAIL_LENGTH = 20; // Length of the bullet trail
@@ -780,6 +766,11 @@ export function handleShooting(input, player, scene, gameState) {
         // Shoot bullet
         shootBullet(input, weapon, player, scene);
         
+        // Send firing update to the network
+        if (window.sendPlayerUpdate) {
+            window.sendPlayerUpdate(player, true, weapon.name);
+        }
+        
         return true;
     } else if (weapon.ammo <= 0) {
         // Play empty gun sound (if available)
@@ -1159,6 +1150,7 @@ function shootBullet(input, weapon, player, scene) {
 export function updateBullets(scene, zombies = []) {
     const currentTime = Date.now();
     
+    // Update local player bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
         const bullet = bullets[i];
                 
@@ -1282,7 +1274,94 @@ export function updateBullets(scene, zombies = []) {
             bullets.splice(i, 1);
         }
     }
+    
+    // Update remote player bullets (similar logic but no zombie collision)
+    for (let i = remotePlayerBullets.length - 1; i >= 0; i--) {
+        const bullet = remotePlayerBullets[i];
+        
+        // Update bullet position
+        bullet.mesh.position.add(bullet.velocity);
+        
+        // Update light position if it exists
+        if (bullet.light) {
+            bullet.light.position.copy(bullet.mesh.position);
+        }
+        
+        // Update the trail
+        const positions = bullet.trailPositions;
+        // Shift old positions back
+        for (let j = positions.length - 3; j >= 3; j -= 3) {
+            positions[j] = positions[j - 3];
+            positions[j + 1] = positions[j - 2];
+            positions[j + 2] = positions[j - 1];
+        }
+        
+        // Add new position
+        positions[0] = bullet.mesh.position.x;
+        positions[1] = bullet.mesh.position.y;
+        positions[2] = bullet.mesh.position.z;
+        
+        // Update the buffer attribute
+        bullet.trail.geometry.attributes.position.needsUpdate = true;
+        
+        // Update distance traveled
+        const travelDistance = bullet.velocity.length();
+        bullet.distance += travelDistance;
+        
+        // Remote player bullets don't cause damage but should still be removed when too old or traveled too far
+        if (bullet.distance > bullet.maxDistance || 
+            currentTime - bullet.createdAt > BULLET_LIFE_TIME) {
+            scene.remove(bullet.mesh);
+            scene.remove(bullet.trail);
+            if (bullet.light) {
+                scene.remove(bullet.light);
+            }
+            remotePlayerBullets.splice(i, 1);
+        }
+    }
 }
 
 // Initialize the bullet model immediately
 initBulletModel();
+
+// Function to get the bullet model (for remote players)
+export function getBulletModel() {
+    if (!bulletModel) {
+        initBulletModel();
+    }
+    return bulletModel;
+}
+
+// Add a remote player bullet to be updated
+export function addRemoteBullet(bullet) {
+    remotePlayerBullets.push(bullet);
+}
+
+export function resetBullets(scene) {
+    // Clear all bullets (local player and remote players)
+    while (bullets.length > 0) {
+        const bullet = bullets.pop();
+        if (scene) {
+            scene.remove(bullet.mesh);
+            scene.remove(bullet.trail);
+            if (bullet.light) {
+                scene.remove(bullet.light);
+            }
+        }
+    }
+    
+    // Clear all remote player bullets
+    while (remotePlayerBullets.length > 0) {
+        const bullet = remotePlayerBullets.pop();
+        if (scene) {
+            scene.remove(bullet.mesh);
+            scene.remove(bullet.trail);
+            if (bullet.light) {
+                scene.remove(bullet.light);
+            }
+        }
+    }
+    
+    // Reset bullet model
+    bulletModel = null;
+}
