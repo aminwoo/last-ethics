@@ -331,10 +331,38 @@ export function updateZombies(deltaTime) {
         if (timeSinceHit < 200) {
             // Flash red when hit
             zombie.traverse((child) => {
-                if (child.isMesh && child.material && !child.material.emissive) {
-                    child.material = child.material.clone();
-                    child.material.emissive = new THREE.Color(0x880000);
-                    child.material.emissiveIntensity = 1 - (timeSinceHit / 200);
+                if (child.isMesh && child.material) {
+                    // Check if this material type supports emissive properties
+                    const supportsEmissive = 
+                        child.material.type === 'MeshStandardMaterial' || 
+                        child.material.type === 'MeshPhongMaterial' || 
+                        child.material.type === 'MeshLambertMaterial';
+                    
+                    if (supportsEmissive) {
+                        // Clone material to avoid affecting other instances
+                        if (!child.userData.originalMaterial) {
+                            child.userData.originalMaterial = child.material;
+                            child.material = child.material.clone();
+                        }
+                        // Apply emissive glow
+                        child.material.emissive.set(0x880000);
+                        child.material.emissiveIntensity = 1 - (timeSinceHit / 200);
+                    } else if (child.material.type === 'MeshBasicMaterial') {
+                        // For basic materials, we can just adjust the color directly
+                        if (!child.userData.originalColor) {
+                            child.userData.originalColor = child.material.color.clone();
+                            child.material = child.material.clone();
+                        }
+                        // Blend toward red
+                        const blend = 1 - (timeSinceHit / 200);
+                        child.material.color.set(
+                            new THREE.Color().lerpColors(
+                                child.userData.originalColor,
+                                new THREE.Color(0xff0000),
+                                blend
+                            )
+                        );
+                    }
                 }
             });
             
@@ -384,10 +412,22 @@ export function updateZombies(deltaTime) {
         } else if (timeSinceHit >= 200 && timeSinceHit < 400) {
             // Reset materials after flash
             zombie.traverse((child) => {
-                if (child.isMesh && child.material && child.material.emissive &&
-                    child.material.emissiveIntensity > 0) {
-                    child.material.emissive.set(0x000000);
-                    child.material.emissiveIntensity = 0;
+                if (child.isMesh && child.material) {
+                    // Reset emissive effect if applicable
+                    if (child.material.emissive) {
+                        child.material.emissive.set(0x000000);
+                        child.material.emissiveIntensity = 0;
+                    }
+                    
+                    // Restore original material/color if we stored it
+                    if (child.userData.originalMaterial) {
+                        child.material.dispose(); // Dispose cloned material to prevent memory leaks
+                        child.material = child.userData.originalMaterial;
+                        delete child.userData.originalMaterial;
+                    } else if (child.userData.originalColor) {
+                        child.material.color.copy(child.userData.originalColor);
+                        delete child.userData.originalColor;
+                    }
                 }
             });
             

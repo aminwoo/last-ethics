@@ -43,6 +43,16 @@ function setupKeyboardListeners(inputState, callbacks) {
             case '4': 
                 if (callbacks.onWeaponSwitch) callbacks.onWeaponSwitch(3);
                 break;
+            // Add test mode keys
+            case 't': 
+                if (callbacks.onTestZombies) callbacks.onTestZombies();
+                break;
+            case 'y': 
+                if (callbacks.onTestZombieHorde) callbacks.onTestZombieHorde();
+                break;
+            case 'u': 
+                if (callbacks.onTestZombieDamage) callbacks.onTestZombieDamage();
+                break;
         }
     });
 
