@@ -29,6 +29,9 @@ const uiContainer = document.getElementById('ui-container');
 const gameOverScreen = document.getElementById('game-over-screen');
 const restartGameBtn = document.getElementById('restart-game-btn');
 
+// Flag to track if game is starting
+let isGameStarting = false;
+
 // Hide UI container and game over screen initially
 uiContainer.style.display = 'none';
 gameOverScreen.style.display = 'none';
@@ -118,6 +121,9 @@ initializeScene();
 
 // Function to start the game after username is entered
 async function startGame() {
+    // Prevent multiple clicks
+    if (isGameStarting) return;
+    
     // Get the username
     const username = usernameInput.value.trim();
     
@@ -130,6 +136,13 @@ async function startGame() {
         }, 500);
         return;
     }
+    
+    // Set starting flag and disable button
+    isGameStarting = true;
+    joinGameBtn.disabled = true;
+    joinGameBtn.style.opacity = '0.6';
+    joinGameBtn.style.cursor = 'not-allowed';
+    joinGameBtn.textContent = 'STARTING...';
     
     // Store username in game state
     gameState.playerName = username;
@@ -319,6 +332,12 @@ function updatePlayerAndFlashlight(deltaTime) {
 
 // Function to restart the game after game over
 function restartGame() {
+    // Only allow one click on the restart button
+    restartGameBtn.disabled = true;
+    restartGameBtn.style.opacity = '0.6';
+    restartGameBtn.style.cursor = 'not-allowed';
+    restartGameBtn.textContent = 'RESTARTING...';
+    
     // Hide the game over screen
     gameOverScreen.style.display = 'none';
     
@@ -337,6 +356,14 @@ function restartGame() {
     
     // Reset player health and UI
     updateUI(ui, gameState);
+    
+    // Reset restart button for future use
+    setTimeout(() => {
+        restartGameBtn.disabled = false;
+        restartGameBtn.style.opacity = '1';
+        restartGameBtn.style.cursor = 'pointer';
+        restartGameBtn.textContent = 'TRY AGAIN';
+    }, 1000);
     
     // Resume game
     console.log('Game restarted!');
