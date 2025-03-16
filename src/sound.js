@@ -399,6 +399,7 @@ const SoundManager = {
   
   // Player sound shortcuts
   playerPlayerHit: () => playSound('HURT', { resetTime: true }),
+  playerPlayerDeath: () => playSound('PLAYER_DEATH', { resetTime: true }),
   
   // Ambient sound shortcuts
   playRainAmbience: async () => {

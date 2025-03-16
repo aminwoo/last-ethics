@@ -1209,14 +1209,14 @@ export function damagePlayer(player, damage) {
     
     // Show damage flash effect
     showDamageFlash();
-    
-    // Play hit sound if available
-    try {
-        SoundManager.playerPlayerHit();
-    } catch (error) {
-        console.log('Sound effect not available');
+
+    if (gameState.health <= 0) {
+        SoundManager.playerPlayerDeath();
     }
-    
+    else {
+        SoundManager.playerPlayerHit();
+    }
+
     // Check if player has died
     if (gameState.health <= 0) {
         // Trigger game over

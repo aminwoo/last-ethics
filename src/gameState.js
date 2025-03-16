@@ -150,27 +150,6 @@ export function gameOver() {
     const gameOverScreen = document.getElementById('game-over-screen');
     gameOverScreen.style.display = 'flex';
     
-    // Play player death sound
-    try {
-        // First try to use the sound manager with the registered death sound
-        SoundManager.playSound('PLAYER_DEATH');
-    } catch (error) {
-        console.log('Error playing death sound through SoundManager:', error);
-        
-        // Fallback to direct Audio API if SoundManager fails
-        try {
-            const audio = new Audio('/sounds/731506__soundbitersfx__npcplayer-death-groans-male(1)-[AudioTrimmer.com].wav');
-            audio.volume = 0.8;
-            audio.play().catch(directError => {
-                console.log('Error playing death sound directly:', directError);
-                // Last resort fallback
-                SoundManager.playSound('gameOver');
-            });
-        } catch (fallbackError) {
-            console.log('All sound playback methods failed:', fallbackError);
-        }
-    }
-    
     console.log('Game Over!');
 }
 
