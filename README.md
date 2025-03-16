@@ -11,6 +11,8 @@ A browser-based 3D zombie survival top-down shooter game built with Three.js. Fi
 - Lootable bodies from defeated zombies
 - Environmental obstacles for tactical gameplay
 - Modern UI with health, stamina, and ammo indicators
+- Multiplayer support for playing with friends
+- In-game chat system for player communication
 
 ## Controls
 
@@ -21,27 +23,62 @@ A browser-based 3D zombie survival top-down shooter game built with Three.js. Fi
 - R - Reload
 - 1,2,3 - Switch Weapons
 - ESC - Pause Game
+- T - Open Chat / Start Typing
+- ESC (while typing) - Close Chat
 
 ## Project Structure
 
 ```
 last-ethics/
 ├── assets/           # Images and audio files
-├── src/             # Source code
-│   ├── game.js      # Main game file
-│   └── modules/     # Game modules
-│       ├── constants.js    # Game constants and settings
-│       ├── effects.js      # Visual effects (rain, thunder)
-│       ├── environment.js  # Environment objects and collision
-│       ├── game-state.js   # Game state management
-│       ├── player.js       # Player controls and mechanics
-│       ├── ui.js          # User interface
-│       ├── weapon.js      # Weapon system
-│       ├── weapons.js     # Weapon configurations
-│       └── zombie.js      # Zombie AI and mechanics
-├── index.html       # Main HTML file
-└── README.md       # This file
+├── src/              # Source code
+│   ├── effects.js    # Visual effects (screen shake, etc.)
+│   ├── environment.js # Environmental elements and effects
+│   ├── gameState.js  # Core game state management
+│   ├── input.js      # User input handling
+│   ├── main.js       # Main game initialization and loop
+│   ├── network.js    # Multiplayer networking functionality
+│   ├── player.js     # Player character implementation
+│   ├── sound.js      # Sound effects and music
+│   ├── ui.js         # User interface elements
+│   ├── weapons.js    # Weapon systems and mechanics
+│   └── zombies.js    # Enemy AI and behavior
+└── server/           # Multiplayer server implementation
+    ├── server.js     # WebSocket server for multiplayer
+    └── package.json  # Server dependencies
 ```
+
+## Multiplayer Setup
+
+The game supports multiplayer functionality, allowing players to see and interact with each other in the same game world. To enable multiplayer:
+
+1. Install server dependencies:
+   ```bash
+   cd server
+   npm install
+   ```
+
+2. Start the multiplayer server:
+   ```bash
+   npm start
+   ```
+
+3. Open the game in multiple browser windows or on different computers connected to the same network.
+
+The server runs on port 3000 by default, and the game client will automatically connect to it when launched.
+
+### Multiplayer Troubleshooting
+
+If you're having trouble with the multiplayer functionality:
+
+1. Make sure the server is running before starting the game
+2. Check your browser console (F12) for connection errors
+3. If playing across different devices, ensure they're on the same network
+4. The players appear with bright red bodies, yellow heads, and a cyan beam above them
+5. Press 'M' key to toggle detailed debug information about connected players
+6. Try refreshing the page if players don't appear
+7. For local testing, you can open multiple browser windows to test with multiple players
+8. If you see multiple player counts on the server, try closing all browser windows and restarting both the server and clients
 
 ## Contributing
 
@@ -122,3 +159,20 @@ Testing commands will output information to the console (F12 to view):
 - Death notifications
 
 Enjoy testing the different zombie types!
+
+## Multiplayer Features
+
+### Player Presence
+- See other players moving in real-time
+- Players appear with bright red bodies, yellow heads, and a cyan beam
+- Player count shown in the top-right corner
+
+### Chat System
+- Press 'T' to open the chat box
+- Type your message and press Enter to send
+- Press ESC to close the chat
+- System messages appear in yellow
+- Your messages appear in teal
+- Other players' messages appear in white
+- Chat temporarily appears when new messages arrive
+- Chat fades out when inactive
