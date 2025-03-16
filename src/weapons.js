@@ -1131,6 +1131,7 @@ function shootBullet(input, weapon, player, scene) {
             velocity: velocity,
             speed: bulletSpeed,
             damage: weapon.damage,
+            weaponType: weapon.name, // Add weapon type for knockback calculation
             distance: 0,
             maxDistance: 50,
             createdAt: currentTime
@@ -1199,6 +1200,21 @@ export function updateBullets(scene, zombies = []) {
                         console.log(`Zombie hit! Health reduced to: ${zombie.health}`);
                     } else {
                         console.warn("Zombie hit but no way to apply damage was found");
+                    }
+                    
+                    // Apply knockback force to the zombie
+                    if (zombie.userData && zombie.userData.knockback) {
+                        // Calculate knockback force based on bullet direction and damage
+                        const knockbackForce = bullet.direction.clone().multiplyScalar(
+                            // Scale knockback by damage and weapon type
+                            bullet.damage * 0.02 * (bullet.weaponType === 'Shotgun' ? 0.1 : 0.5)
+                        );
+                        
+                        // Apply knockback velocity to zombie
+                        zombie.userData.knockback.velocity.copy(knockbackForce);
+                        zombie.userData.knockback.active = true;
+                        
+                        console.log(`Applied knockback to zombie: ${knockbackForce.length().toFixed(2)}`);
                     }
                     
                     break; // A bullet can only hit one zombie
