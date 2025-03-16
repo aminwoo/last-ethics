@@ -37,6 +37,10 @@ body {
     margin-bottom: 15px;
 }
 
+.weapon-container {
+    margin-top: 5px;
+}
+
 .status-label {
     font-size: 14px;
     margin-bottom: 5px;
@@ -86,19 +90,11 @@ body {
     text-shadow: 0 0 3px #000;
 }
 
-#weapon-panel {
-    position: absolute;
-    bottom: 25px;
-    right: 25px;
-    padding: 15px;
-    border-radius: 8px;
-    background-color: rgba(0, 20, 40, 0.6);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 0 20px rgba(0, 100, 255, 0.3), inset 0 0 15px rgba(0, 150, 255, 0.2);
-    border: 1px solid rgba(0, 150, 255, 0.3);
+#weapon-display {
     display: flex;
     align-items: center;
     gap: 15px;
+    margin-top: 5px;
 }
 
 #weapon-image-container {
@@ -127,20 +123,20 @@ body {
 }
 
 #weapon-info {
-    text-align: right;
+    text-align: left;
 }
 
 #weapon-name {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
     font-family: 'Orbitron', sans-serif;
     letter-spacing: 1px;
     text-transform: uppercase;
 }
 
 #ammo-counter {
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 900;
     font-family: 'Orbitron', sans-serif;
     letter-spacing: 2px;

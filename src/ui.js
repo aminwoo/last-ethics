@@ -204,11 +204,11 @@ function updateUI(ui, gameState) {
         ui.ammoCounter.textContent = "RELOADING";
         ui.ammoCounter.style.color = '#ffaa00';
         ui.ammoCounter.style.textShadow = '0 0 10px rgba(255, 150, 0, 0.8)';
-        ui.ammoCounter.style.fontSize = '22px'; // Slightly smaller text for "RELOADING"
+        ui.ammoCounter.style.fontSize = '18px'; // Smaller text for "RELOADING"
     } else {
         // Show normal ammo counter
         ui.ammoCounter.textContent = `${gameState.weapon.ammo} / ${gameState.weapon.totalAmmo}`;
-        ui.ammoCounter.style.fontSize = '28px'; // Reset to original size
+        ui.ammoCounter.style.fontSize = '22px'; // Reset to original size
         
         // Change ammo counter color based on ammo level
         if (gameState.weapon.ammo === 0) {
