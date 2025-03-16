@@ -3,6 +3,7 @@ import { weapons, switchWeapon, reloadWeapon, checkReloadCompletion } from './we
 
 // Initial game state
 const gameState = {
+    playerName: "Survivor", // Default player name
     health: 100,
     maxHealth: 100,
     stamina: 100,

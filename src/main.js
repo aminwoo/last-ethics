@@ -21,88 +21,201 @@ import {
 import { updateScreenShake } from './effects.js';
 import * as ZombieSystem from './zombies.js';
 
+// DOM elements
+const welcomeScreen = document.getElementById('welcome-screen');
+const usernameInput = document.getElementById('username');
+const joinGameBtn = document.getElementById('join-game-btn');
+const uiContainer = document.getElementById('ui-container');
+
+// Hide UI container initially
+uiContainer.style.display = 'none';
+
+// Welcome screen event handlers
+joinGameBtn.addEventListener('click', startGame);
+usernameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        startGame();
+    }
+});
+
+// Play background ambience while on welcome screen
 SoundManager.playRainAmbience();
 
-// Initialize UI
-const ui = initializeUI();
-// Initialize minimap
-initializeMinimap(ui);
+// Variables to store initialized game objects
+let ui, input, scene, camera, renderer, raycaster, groundPlane, 
+    groundIntersectPoint, environment, player;
 
-// Initialize input
-const input = initializeInput();
+// Initialize basic scene elements but don't start the game loop yet
+function initializeScene() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050505);
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050505);
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 25, 0);
+    camera.lookAt(0, 0, 0);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 25, 0);
-camera.lookAt(0, 0, 0);
+    scene.camera = camera;
 
-scene.camera = camera;
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-document.getElementById('gameContainer').appendChild(renderer.domElement);
-
-// Create a raycaster for mouse interaction
-const raycaster = new THREE.Raycaster();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const groundIntersectPoint = new THREE.Vector3();
-
-// Set up window resize handler
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    document.getElementById('gameContainer').appendChild(renderer.domElement);
+
+    // Create a raycaster for mouse interaction
+    raycaster = new THREE.Raycaster();
+    groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    groundIntersectPoint = new THREE.Vector3();
+
+    // Set up window resize handler
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Set up input handlers
+    setupResizeListener(onWindowResize);
+
+    // Add ambient light
+    const ambientLight = new THREE.AmbientLight(0x101010); // Very dim ambient light
+    scene.add(ambientLight);
+
+    // Create ground plane
+    const groundGeometry = new THREE.PlaneGeometry(500, 500);
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x333333,
+        roughness: 0.8,
+        metalness: 0.2
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const gridHelper = new THREE.GridHelper(300, 300, 0x000000, 0x222222);
+    gridHelper.position.y = 0.0;
+    scene.add(gridHelper);
+    
+    // Return the initialized scene
+    return {
+        scene,
+        camera,
+        renderer,
+        raycaster,
+        groundPlane,
+        groundIntersectPoint
+    };
 }
 
-// Set up input handlers
-setupResizeListener(onWindowResize);
+// Initialize the scene but don't start the game loop yet
+initializeScene();
 
-// Create environment
-const environment = createEnvironment(scene, camera);
+// Function to start the game after username is entered
+function startGame() {
+    // Get the username
+    const username = usernameInput.value.trim();
+    
+    // Validate username (non-empty)
+    if (!username) {
+        // Add a simple shake animation for invalid input
+        usernameInput.classList.add('shake');
+        setTimeout(() => {
+            usernameInput.classList.remove('shake');
+        }, 500);
+        return;
+    }
+    
+    // Store username in game state
+    gameState.playerName = username;
+    
+    // Hide welcome screen with a fade-out effect
+    welcomeScreen.style.opacity = '0';
+    welcomeScreen.style.transition = 'opacity 1s ease-out';
+    
+    // Wait for the fade-out animation to complete
+    setTimeout(() => {
+        // Hide welcome screen
+        welcomeScreen.style.display = 'none';
+        
+        // Show UI
+        uiContainer.style.display = 'block';
+        
+        // Initialize and start the game
+        initializeGame();
+    }, 1000);
+}
 
-// Make obstacles available globally for zombie collision detection
-window.environmentObstacles = environment.obstacles || [];
+// Full game initialization and start
+function initializeGame() {
+    // Initialize UI
+    ui = initializeUI();
+    // Initialize minimap
+    initializeMinimap(ui);
 
-// Create player
-const player = initializePlayer(scene, gameState);
+    // Initialize input
+    input = initializeInput();
 
-setupMouseListeners(input, {
-    onMouseMove: (clientMousePosition) => {
-        updateCrosshair(ui, clientMousePosition);
-    },
-    onMouseClick: () => handleShooting(input, player, scene, gameState)
-});
+    // Create environment
+    environment = createEnvironment(scene, camera);
 
-setupKeyboardListeners(input, {
-    onReload: () => handleReload(player, reloadWeapon, gameState),
-    onWeaponSwitch: (weaponIndex) => handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState)
-});
+    // Make obstacles available globally for zombie collision detection
+    window.environmentObstacles = environment.obstacles || [];
 
-// Add ambient light
-const ambientLight = new THREE.AmbientLight(0x101010); // Very dim ambient light
-scene.add(ambientLight);
+    // Create player
+    player = initializePlayer(scene, gameState);
 
-// Create ground plane
-const groundGeometry = new THREE.PlaneGeometry(500, 500);
-const groundMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x333333,
-    roughness: 0.8,
-    metalness: 0.2
-});
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = 0;
-ground.receiveShadow = true;
-scene.add(ground);
+    // Set up mouse listeners for crosshair and shooting
+    setupMouseListeners(input, {
+        onMouseMove: (clientMousePosition) => {
+            updateCrosshair(ui, clientMousePosition);
+        },
+        onMouseClick: () => handleShooting(input, player, scene, gameState)
+    });
 
-const gridHelper = new THREE.GridHelper(300, 300, 0x000000, 0x222222);
-gridHelper.position.y = 0.0;
-scene.add(gridHelper);
+    // Set up keyboard listeners for weapon switching and reloading
+    setupKeyboardListeners(input, {
+        onReload: () => handleReload(player, reloadWeapon, gameState),
+        onWeaponSwitch: (weaponIndex) => handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState)
+    });
+
+    // Spawn initial zombies
+    spawnInitialZombies();
+
+    // Start the animation loop
+    renderer.setAnimationLoop(animate);
+    
+    // Add Z key for spawning zombies
+    window.addEventListener('keydown', (event) => {
+        // Z key to spawn more zombies around the player
+        if (event.key.toLowerCase() === 'z') {
+            const playerPosition = player.position.clone();
+            // Spawn zombies at a distance from the player in a random direction
+            const spawnDistance = 15;
+            const spawnPosition = new THREE.Vector3(
+                playerPosition.x + (Math.random() * 2 - 1) * spawnDistance,
+                0,
+                playerPosition.z + (Math.random() * 2 - 1) * spawnDistance
+            );
+            
+            // Spawn 3-8 zombies
+            const zombieCount = Math.floor(Math.random() * 6) + 3;
+            ZombieSystem.spawnZombieHorde(scene, spawnPosition, zombieCount, player);
+            
+            console.log(`Spawned ${zombieCount} zombies at distance ${spawnDistance}`);
+        }
+    });
+}
+
+// Spawn initial zombies
+function spawnInitialZombies() {
+    // Spawn a horde of zombies at different positions
+    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(10, 0, 10), 5, player);
+    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(-10, 0, -15), 5, player);
+    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(15, 0, -10), 3, player);
+}
 
 // Update the animate function to include time delta for animations
 let lastTime = 0;
@@ -174,29 +287,3 @@ function updatePlayerAndFlashlight(deltaTime) {
     // Return direction for minimap
     return direction;
 }
-
-// Start the animation loop
-renderer.setAnimationLoop(animate);
-
-// In your key down handler or wherever keyboard input is handled
-window.addEventListener('keydown', (event) => {
-    // ... existing key handlers ...
-    
-    // Z key to spawn more zombies around the player
-    if (event.key.toLowerCase() === 'z') {
-        const playerPosition = player.position.clone();
-        // Spawn zombies at a distance from the player in a random direction
-        const spawnDistance = 15;
-        const spawnPosition = new THREE.Vector3(
-            playerPosition.x + (Math.random() * 2 - 1) * spawnDistance,
-            0,
-            playerPosition.z + (Math.random() * 2 - 1) * spawnDistance
-        );
-        
-        // Spawn 3-8 zombies
-        const zombieCount = Math.floor(Math.random() * 6) + 3;
-        ZombieSystem.spawnZombieHorde(scene, spawnPosition, zombieCount, player);
-        
-        console.log(`Spawned ${zombieCount} zombies at distance ${spawnDistance}`);
-    }
-});
