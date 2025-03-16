@@ -1162,9 +1162,8 @@ export function updateBullets(scene, zombies = []) {
             
             for (let j = 0; j < zombies.length; j++) {
                 const zombie = zombies[j];
-                // Skip if zombie is not valid or already dead/dying
-                if (!zombie || !zombie.position || 
-                    (zombie.userData && (zombie.userData.isDead))) {
+
+                if (zombie.userData.health <= 0) {
                     continue;
                 }
                 

@@ -295,37 +295,7 @@ export function updateZombies(deltaTime) {
             continue;
         }
         
-        // Update death animation
-        if (userData.isDying) {
-            userData.animationTime += deltaTime;
-            
-            // Play death animation for 1.5 seconds
-            if (userData.animationTime <= 1.5) {
-                animateZombieDying(zombie, userData.animationTime / 1.5);
-            } else {
-                // Mark as fully dead after animation completes
-                userData.isDead = true;
-                userData.isDying = false;
-            }
-            continue;
-        }
-        
-        // Handle knockback effect
-        if (userData.knockback && userData.knockback.active) {
-            // Apply knockback velocity to zombie position
-            zombie.position.x += userData.knockback.velocity.x * deltaTime * 60;
-            zombie.position.z += userData.knockback.velocity.z * deltaTime * 60;
-            
-            // Decay knockback over time
-            userData.knockback.velocity.multiplyScalar(userData.knockback.decayRate);
-            
-            // Deactivate knockback when it becomes negligible
-            if (userData.knockback.velocity.length() < 0.001) {
-                userData.knockback.active = false;
-                userData.knockback.velocity.set(0, 0, 0);
-            }
-        }
-        
+
         // Apply hit effect (flash red)
         const timeSinceHit = currentTime - userData.hitTime;
         if (timeSinceHit < 200) {
@@ -466,6 +436,38 @@ export function updateZombies(deltaTime) {
                 }
             }
         }
+
+        // Update death animation
+        if (userData.isDying) {
+            userData.animationTime += deltaTime;
+            
+            // Play death animation for 1.5 seconds
+            if (userData.animationTime <= 1.5) {
+                animateZombieDying(zombie, userData.animationTime / 1.5);
+            } else {
+                // Mark as fully dead after animation completes
+                userData.isDead = true;
+                userData.isDying = false;
+            }
+            continue;
+        }
+        
+        // Handle knockback effect
+        if (userData.knockback && userData.knockback.active) {
+            // Apply knockback velocity to zombie position
+            zombie.position.x += userData.knockback.velocity.x * deltaTime * 60;
+            zombie.position.z += userData.knockback.velocity.z * deltaTime * 60;
+            
+            // Decay knockback over time
+            userData.knockback.velocity.multiplyScalar(userData.knockback.decayRate);
+            
+            // Deactivate knockback when it becomes negligible
+            if (userData.knockback.velocity.length() < 0.001) {
+                userData.knockback.active = false;
+                userData.knockback.velocity.set(0, 0, 0);
+            }
+        }
+                
         
         // Move towards player if one is assigned
         if (userData.targetPlayer && userData.isMoving) {
