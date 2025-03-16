@@ -69,6 +69,12 @@ const SOUNDS = {
     category: SOUND_CATEGORIES.PLAYER,
     loop: false
   },
+  PLAYER_DEATH: {
+    url: '/sounds/731506__soundbitersfx__npcplayer-death-groans-male(1)-[AudioTrimmer.com].wav',
+    volume: 1.0,
+    category: SOUND_CATEGORIES.PLAYER,
+    loop: false
+  },
   EMPTY_CLIP: {
     url: '/sounds/empty_clip.wav',
     volume: 1.0,
