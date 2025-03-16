@@ -23,7 +23,8 @@ import {
     handleWeaponSwitch,
     handleReload,
     handleShooting,
-    updateBullets
+    updateBullets,
+    resetBullets
 } from './weapons.js';
 import { updateScreenShake } from './effects.js';
 import * as ZombieSystem from './zombies.js';
@@ -511,6 +512,9 @@ function restartGame() {
     
     // Reset game state
     initializeGameState();
+    
+    // Reset bullets before clearing zombies
+    resetBullets(scene);
     
     // Clear existing zombies
     while (ZombieSystem.getZombies().length > 0) {

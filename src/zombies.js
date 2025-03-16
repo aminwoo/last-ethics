@@ -587,8 +587,12 @@ export function updateZombies(deltaTime) {
 function calculateZombieSeparation(zombie, currentIndex) {
     const separationForce = new THREE.Vector3(0, 0, 0);
     
+    // Maximum number of zombies to check for separation (performance optimization)
+    const maxZombiesToCheck = 8;
+    let zombiesChecked = 0;
+    
     // Check collision with other zombies - higher priority than obstacles
-    for (let i = 0; i < zombies.length; i++) {
+    for (let i = 0; i < zombies.length && zombiesChecked < maxZombiesToCheck; i++) {
         // Skip self and dead zombies
         if (i === currentIndex || zombies[i].userData.isDead || zombies[i].userData.isDying) {
             continue;
@@ -597,10 +601,18 @@ function calculateZombieSeparation(zombie, currentIndex) {
         const otherZombie = zombies[i];
         const distance = zombie.position.distanceTo(otherZombie.position);
         
+        // Only check zombies within a reasonable distance (performance optimization)
+        const maxCheckDistance = 5;
+        if (distance > maxCheckDistance) {
+            continue;
+        }
+        
+        zombiesChecked++;
+        
         // Calculate combined radius for both zombies for collision detection
-        // Use larger radius to prevent any stacking - increase by 50%
+        // Use slightly smaller radius to allow tighter grouping
         const combinedRadius = (zombie.userData.radius || 0.5) + (otherZombie.userData.radius || 0.5);
-        const desiredDistance = combinedRadius * 1.5; // Increase buffer from 20% to 50%
+        const desiredDistance = combinedRadius * 1.2; // Reduced from 1.5 to 1.2
         
         // Use exponential force as zombies get closer to each other
         if (distance < desiredDistance) {
@@ -611,33 +623,34 @@ function calculateZombieSeparation(zombie, currentIndex) {
             ).normalize();
             
             // Force is stronger the closer they are (exponential increase as they get closer)
-            // Distance ratio squared for stronger avoidance at close distances
-            const forceMagnitude = Math.pow((desiredDistance - distance) / desiredDistance, 2) * 2.0;
+            // Less aggressive scaling to avoid sudden stops
+            const forceMagnitude = Math.pow((desiredDistance - distance) / desiredDistance, 1.5) * 1.5;
             
-            // Scale by zombie speed with priority factor
-            const forceStrength = zombie.userData.speed * 1.0 * forceMagnitude;
+            // Scale by zombie speed with priority factor - but don't make it too strong
+            const forceStrength = zombie.userData.speed * 0.7 * forceMagnitude;
             
             // Add to total separation force
             separationForce.add(
                 awayDirection.multiplyScalar(forceStrength)
             );
             
-            // When zombies are extremely close (about to stack), apply emergency separation
-            if (distance < combinedRadius * 0.8) {
-                // Apply a much stronger force in the direction away from the other zombie
+            // Only apply emergency separation when extremely close (reduced threshold and strength)
+            if (distance < combinedRadius * 0.6) {
+                // Apply a stronger force in the direction away from the other zombie, but not too strong
                 const emergencyForce = awayDirection.clone().multiplyScalar(
-                    zombie.userData.speed * 5.0 // Very strong push
+                    zombie.userData.speed * 2.5 // Reduced from 5.0 to 2.5
                 );
                 separationForce.add(emergencyForce);
             }
         }
     }
     
-    // Check collision with environment obstacles (secondary priority)
-    if (window.environmentObstacles) {
+    // Only check obstacles if we haven't used up all our separation budget on zombies
+    if (zombiesChecked < maxZombiesToCheck && window.environmentObstacles) {
         const obstacles = window.environmentObstacles;
+        const maxObstaclesToCheck = Math.min(obstacles.length, maxZombiesToCheck - zombiesChecked);
         
-        for (let i = 0; i < obstacles.length; i++) {
+        for (let i = 0; i < maxObstaclesToCheck; i++) {
             const obstacle = obstacles[i];
             
             if (obstacle.userData && obstacle.userData.type === 'obstacle') {
@@ -648,7 +661,7 @@ function calculateZombieSeparation(zombie, currentIndex) {
                 const zombieRadius = zombie.userData.radius || 0.5;
                 
                 // Calculate minimum distance to maintain
-                const minDistance = obstacleRadius + zombieRadius + 0.8; // Increased buffer
+                const minDistance = obstacleRadius + zombieRadius + 0.5; // Reduced from 0.8 to 0.5
                 
                 // If zombie is too close to obstacle
                 if (distance < minDistance) {
@@ -659,10 +672,10 @@ function calculateZombieSeparation(zombie, currentIndex) {
                     ).normalize();
                     
                     // Force is stronger the closer they are (exponential)
-                    const forceMagnitude = Math.pow((minDistance - distance) / minDistance, 2) * 1.5;
+                    const forceMagnitude = Math.pow((minDistance - distance) / minDistance, 1.5) * 1.2;
                     
                     // Scale by zombie speed 
-                    const forceStrength = zombie.userData.speed * 1.2 * forceMagnitude;
+                    const forceStrength = zombie.userData.speed * 1.0 * forceMagnitude;
                     
                     // Add to total separation force
                     separationForce.add(
@@ -671,6 +684,12 @@ function calculateZombieSeparation(zombie, currentIndex) {
                 }
             }
         }
+    }
+    
+    // Cap the maximum separation force to prevent zombies from stopping completely
+    const maxForce = zombie.userData.speed * 1.5;
+    if (separationForce.length() > maxForce) {
+        separationForce.normalize().multiplyScalar(maxForce);
     }
     
     return separationForce;
@@ -683,31 +702,33 @@ function calculateSteeringForce(zombie, targetDirection, separationForce, separa
     
     // Check if separation force is significant - if so, prioritize it
     const separationMagnitude = separationForce.length();
-    const isCollisionImminent = separationMagnitude > 0.01;
+    const isCollisionImminent = separationMagnitude > 0.02; // Increased threshold slightly
     
     // 1. Weighted Separation (avoid other zombies and obstacles)
-    // Increase separation strength when collisions are imminent
+    // Reduction in separation strength multiplier to prevent stopping
     const adjustedSeparationStrength = isCollisionImminent ? 
-                                      separationStrength * 3.0 : 
-                                      separationStrength;
+                                      separationStrength * 2.0 : // Reduced from 3.0 to 2.0
+                                      separationStrength * 0.8;  // Reduced to 80% of original
     
     const separationVector = separationForce.clone().multiplyScalar(adjustedSeparationStrength);
     steeringForce.add(separationVector);
     
-    // If we're very close to a collision, make separation the dominant force
+    // If we're very close to a collision, make separation important but not dominant
     if (separationMagnitude > 0.03) {
-        // Prioritize separation over other behaviors
-        return steeringForce.multiplyScalar(userData.speed * 1.5);
+        // Balance separation with forward movement
+        const seekVector = targetDirection.clone().multiplyScalar(userData.speed * 0.4);
+        steeringForce.add(seekVector);
+        return steeringForce.multiplyScalar(1.0); // Reduced multiplier from 1.5 to 1.0
     }
     
     // 2. Seeking behavior (move toward target/player)
-    // Reduce seeking strength when there are nearby obstacles or zombies
-    const seekWeight = userData.zombieType === 'RUNNER' ? 0.8 : 
-                      (userData.zombieType === 'BRUTE' ? 0.5 : 0.6);
+    // Increase base seeking strength to emphasize forward movement
+    const seekWeight = userData.zombieType === 'RUNNER' ? 0.9 : // Increased from 0.8 to 0.9
+                      (userData.zombieType === 'BRUTE' ? 0.6 : 0.7); // Increased weights
     
-    // Adjust seek weight based on collision proximity
+    // Make seeking more resilient to collision avoidance
     const adjustedSeekWeight = isCollisionImminent ? 
-                               seekWeight * (1.0 - Math.min(separationMagnitude * 5, 0.9)) : 
+                               seekWeight * (1.0 - Math.min(separationMagnitude * 3, 0.7)) : // Reduced from 0.9 to 0.7
                                seekWeight;
     
     const seekVector = targetDirection.clone().multiplyScalar(adjustedSeekWeight);
@@ -720,19 +741,18 @@ function calculateSteeringForce(zombie, targetDirection, separationForce, separa
     // This creates more realistic movement by making zombies turn gradually
     const alignmentFactor = forwardDirection.dot(targetDirection);
     
-    // If the zombie is already moving in a similar direction, maintain momentum
-    // But reduce this when near obstacles
+    // Increased inertia to maintain momentum even when avoiding obstacles
     const inertiaWeight = isCollisionImminent ? 
-                         0.05 * (alignmentFactor > 0 ? alignmentFactor : 0) : 
-                         0.2 * (alignmentFactor > 0 ? alignmentFactor : 0);
+                         0.1 * (alignmentFactor > 0 ? alignmentFactor : 0) : // Increased from 0.05 to 0.1
+                         0.25 * (alignmentFactor > 0 ? alignmentFactor : 0); // Increased from 0.2 to 0.25
     
     const inertiaVector = forwardDirection.clone().multiplyScalar(inertiaWeight);
     
     // 4. Random movement (wander behavior) - adds unpredictability
     // Reduce randomness when avoiding obstacles
     const randomStrength = isCollisionImminent ? 
-                          0.02 : 
-                          (userData.zombieType === 'REGULAR' ? 0.1 : 0.05);
+                          0.01 : // Reduced from 0.02 to 0.01
+                          (userData.zombieType === 'REGULAR' ? 0.08 : 0.04); // Reduced slightly
     
     const randomVector = new THREE.Vector3(
         (Math.random() - 0.5) * 2 * randomStrength,
@@ -741,14 +761,14 @@ function calculateSteeringForce(zombie, targetDirection, separationForce, separa
     );
     
     // 5. Group cohesion - zombies tend to stay near each other, forming hordes
-    // Completely ignore cohesion when collisions are imminent
+    // Reduced cohesion radius and weight for better performance
     let cohesionVector = new THREE.Vector3(0, 0, 0);
     
     if (!isCollisionImminent) {
-        // Find center of nearby zombies
-        cohesionVector = calculateCohesionForce(zombie, 10); // Look for zombies within 10 units
-        const cohesionWeight = userData.zombieType === 'REGULAR' ? 0.15 : 
-                              (userData.zombieType === 'RUNNER' ? 0.05 : 0.2);
+        // Find center of nearby zombies (reduced radius)
+        cohesionVector = calculateCohesionForce(zombie, 8); // Reduced from 10 to 8
+        const cohesionWeight = userData.zombieType === 'REGULAR' ? 0.1 : // Reduced from 0.15 to 0.1
+                              (userData.zombieType === 'RUNNER' ? 0.03 : 0.15); // Reduced weights
         cohesionVector.multiplyScalar(cohesionWeight);
     }
     
@@ -761,14 +781,19 @@ function calculateSteeringForce(zombie, targetDirection, separationForce, separa
     // Apply character-specific adjustments
     if (userData.zombieType === 'BRUTE') {
         // Brutes move more purposefully with less randomness
-        steeringForce.multiplyScalar(0.8); // Slow down overall movement
+        steeringForce.multiplyScalar(0.85); // Increased from 0.8 to 0.85
     } else if (userData.zombieType === 'RUNNER') {
         // Runners can make sharper turns and move more erratically
-        steeringForce.multiplyScalar(1.2); // More responsive
+        steeringForce.multiplyScalar(1.25); // Increased from 1.2 to 1.25
     }
     
     // Scale force by the zombie's speed
     steeringForce.multiplyScalar(userData.speed);
+    
+    // Ensure the zombie always has some minimal forward movement
+    if (steeringForce.length() < userData.speed * 0.2) {
+        steeringForce.add(targetDirection.clone().multiplyScalar(userData.speed * 0.2));
+    }
     
     return steeringForce;
 }
@@ -1211,10 +1236,11 @@ export function damagePlayer(player, damage) {
     showDamageFlash();
 
     if (gameState.health <= 0) {
-        SoundManager.playerPlayerDeath();
+        // Use the correct function name for playing death sound
+        SoundManager.playPlayerDeath();
     }
     else {
-        SoundManager.playerPlayerHit();
+        SoundManager.playPlayerHit();
     }
 
     // Check if player has died
