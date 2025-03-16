@@ -26,7 +26,7 @@ export const WAVE_SETTINGS = {
     exponentialFactor: 0.1, // Additional exponential scaling factor
     exponentialWaveThreshold: 10, // When exponential scaling begins
     
-    // Wave composition (percentage of different zombie types)
+    // Wave composition (percentage of different zombie atypes)
     composition: [
         // Wave 1-3: Mostly regular zombies, few runners
         { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0 },
@@ -150,11 +150,25 @@ export function gameOver() {
     const gameOverScreen = document.getElementById('game-over-screen');
     gameOverScreen.style.display = 'flex';
     
-    // Try to play game over sound
+    // Play player death sound
     try {
-        SoundManager.playSound('gameOver');
+        // First try to use the sound manager with the registered death sound
+        SoundManager.playSound('PLAYER_DEATH');
     } catch (error) {
-        console.log('Sound effect not available');
+        console.log('Error playing death sound through SoundManager:', error);
+        
+        // Fallback to direct Audio API if SoundManager fails
+        try {
+            const audio = new Audio('/sounds/731506__soundbitersfx__npcplayer-death-groans-male(1)-[AudioTrimmer.com].wav');
+            audio.volume = 0.8;
+            audio.play().catch(directError => {
+                console.log('Error playing death sound directly:', directError);
+                // Last resort fallback
+                SoundManager.playSound('gameOver');
+            });
+        } catch (fallbackError) {
+            console.log('All sound playback methods failed:', fallbackError);
+        }
     }
     
     console.log('Game Over!');
