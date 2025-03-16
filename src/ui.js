@@ -159,6 +159,18 @@ function updateUI(ui, gameState) {
         ui.healthBar.classList.remove('low-health');
     }
     
+    // Show invulnerability state
+    if (gameState.isInvulnerable) {
+        // Create a pulsing effect on the health bar during invulnerability
+        const pulseOpacity = 0.6 + 0.4 * Math.sin(Date.now() / 100);
+        ui.healthBar.style.boxShadow = `0 0 10px rgba(255, 255, 255, ${pulseOpacity})`;
+        ui.healthBar.style.borderColor = '#FFFFFF';
+    } else {
+        // Remove effects when not invulnerable
+        ui.healthBar.style.boxShadow = 'none';
+        ui.healthBar.style.borderColor = '';
+    }
+    
     // Update stamina bar
     const staminaPercent = (gameState.stamina / gameState.maxStamina) * 100;
     ui.staminaBar.style.width = `${staminaPercent}%`;

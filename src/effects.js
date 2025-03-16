@@ -30,3 +30,26 @@ export function updateScreenShake(camera) {
     }
 }
 
+// Screen flash effect when player takes damage
+export function showDamageFlash() {
+    const damageFlash = document.getElementById('damage-flash');
+    if (!damageFlash) return;
+    
+    // Setup flash styles
+    damageFlash.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+    damageFlash.style.opacity = '1';
+    damageFlash.style.pointerEvents = 'none';
+    damageFlash.style.position = 'absolute';
+    damageFlash.style.top = '0';
+    damageFlash.style.left = '0';
+    damageFlash.style.width = '100%';
+    damageFlash.style.height = '100%';
+    damageFlash.style.zIndex = '1000';
+    damageFlash.style.transition = 'opacity 0.5s ease-out';
+    
+    // Show flash
+    setTimeout(() => {
+        damageFlash.style.opacity = '0';
+    }, 100);
+}
+

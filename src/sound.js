@@ -392,7 +392,7 @@ const SoundManager = {
   playEmptyClip: () => playSound('EMPTY_CLIP', { resetTime: true }),
   
   // Player sound shortcuts
-  playHurt: () => playSound('HURT', { resetTime: true }),
+  playerPlayerHit: () => playSound('HURT', { resetTime: true }),
   
   // Ambient sound shortcuts
   playRainAmbience: async () => {

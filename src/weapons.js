@@ -18,7 +18,7 @@ export const weapons = [
         type: "ranged",
         bulletsPerShot: 1,
         color: 0xffff00, 
-        spread: 0, 
+        spread: 0.15, 
         bulletSpeed: 1.5,
         shakeIntensity: 0.3,
     },
