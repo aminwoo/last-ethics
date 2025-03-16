@@ -24,7 +24,7 @@ export const weapons = [
     },
     {
         name: "Shotgun",
-        damage: 75,
+        damage: 9,
         ammo: 6,
         maxAmmo: 6,
         totalAmmo: 24,

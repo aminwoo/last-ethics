@@ -3,8 +3,8 @@ import SoundManager from './sound.js';
 import * as Weapons from './weapons.js';
 
 // Player movement speed
-const PLAYER_SPEED = 0.15;
-const PLAYER_SPRINT_MULTIPLIER = 1.8;
+const PLAYER_SPEED = 0.07;
+const PLAYER_SPRINT_MULTIPLIER = 1.5;
 
 function createPlayer() {
     const player = new THREE.Group();

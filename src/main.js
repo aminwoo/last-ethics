@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import SoundManager from './sound.js';
-import { gameState, updateGameState, switchWeapon, reloadWeapon, initializeGameState } from './gameState.js';
+import { 
+    gameState, 
+    updateGameState, 
+    switchWeapon, 
+    reloadWeapon, 
+    initializeGameState,
+    getWaveInfo
+} from './gameState.js';
 import { initializeUI, updateUI, updateCrosshair, initializeMinimap, updateMinimap } from './ui.js';
 import { initializeInput, setupKeyboardListeners, setupMouseListeners, setupResizeListener } from './input.js';
 import { 
@@ -46,6 +53,9 @@ usernameInput.addEventListener('keydown', (e) => {
 
 // Game over screen event handlers
 restartGameBtn.addEventListener('click', restartGame);
+
+// Wave event listener
+document.addEventListener('waveStart', handleWaveStart);
 
 // Variables to store initialized game objects
 let ui, input, scene, camera, renderer, raycaster, groundPlane, 
@@ -216,13 +226,13 @@ function initializeGame() {
         onWeaponSwitch: (weaponIndex) => handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState)
     });
 
-    // Spawn initial zombies
-    spawnInitialZombies();
+    // Create wave display UI if it doesn't exist
+    createWaveUI();
 
     // Start the animation loop
     renderer.setAnimationLoop(animate);
     
-    // Add Z key for spawning zombies
+    // Add Z key for spawning zombies (for debugging/testing)
     window.addEventListener('keydown', (event) => {
         // Z key to spawn more zombies around the player
         if (event.key.toLowerCase() === 'z') {
@@ -244,12 +254,167 @@ function initializeGame() {
     });
 }
 
-// Spawn initial zombies
-function spawnInitialZombies() {
-    // Spawn a horde of zombies at different positions
-    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(10, 0, 10), 5, player);
-    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(-10, 0, -15), 5, player);
-    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(15, 0, -10), 3, player);
+// Create UI elements for wave display
+function createWaveUI() {
+    // Check if wave UI already exists
+    if (document.getElementById('wave-display')) return;
+    
+    // Create wave panel
+    const wavePanel = document.createElement('div');
+    wavePanel.id = 'wave-panel';
+    wavePanel.className = 'ui-panel';
+    
+    // Create wave display
+    const waveDisplay = document.createElement('div');
+    waveDisplay.id = 'wave-display';
+    waveDisplay.className = 'wave-text';
+    waveDisplay.textContent = 'Wave: 1';
+    
+    // Create zombies remaining display
+    const zombiesDisplay = document.createElement('div');
+    zombiesDisplay.id = 'zombies-remaining';
+    zombiesDisplay.className = 'wave-text';
+    zombiesDisplay.textContent = 'Zombies: 0';
+    
+    // Create next wave countdown display
+    const countdownDisplay = document.createElement('div');
+    countdownDisplay.id = 'wave-countdown';
+    countdownDisplay.className = 'wave-text';
+    countdownDisplay.textContent = 'Next Wave: --';
+    countdownDisplay.style.display = 'none'; // Hidden initially
+    
+    // Add elements to panel
+    wavePanel.appendChild(waveDisplay);
+    wavePanel.appendChild(zombiesDisplay);
+    wavePanel.appendChild(countdownDisplay);
+    
+    // Add to UI container
+    uiContainer.appendChild(wavePanel);
+    
+    // Create style for wave panel if needed
+    const style = document.createElement('style');
+    style.textContent = `
+        #wave-panel {
+            position: absolute;
+            top: 20px;
+            right: 50%;
+            transform: translateX(50%);
+            margin-top: 60px;
+            background-color: rgba(0, 20, 40, 0.6);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 0 20px rgba(0, 100, 255, 0.3), inset 0 0 15px rgba(0, 150, 255, 0.2);
+            border: 1px solid rgba(0, 150, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+        
+        .wave-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            color: #00ccff;
+            text-shadow: 0 0 10px rgba(0, 200, 255, 0.7);
+            margin: 5px 0;
+            letter-spacing: 1px;
+        }
+        
+        #wave-display {
+            font-weight: 700;
+            font-size: 22px;
+        }
+        
+        #wave-countdown {
+            color: #ffaa00;
+            text-shadow: 0 0 10px rgba(255, 150, 0, 0.7);
+        }
+        
+        @keyframes wave-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .wave-start {
+            animation: wave-pulse 0.5s ease;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Update wave UI elements
+function updateWaveUI() {
+    const waveInfo = getWaveInfo();
+    
+    // Update wave display
+    const waveDisplay = document.getElementById('wave-display');
+    if (waveDisplay) {
+        waveDisplay.textContent = `Wave: ${waveInfo.currentWave}`;
+    }
+    
+    // Update zombies remaining
+    const zombiesDisplay = document.getElementById('zombies-remaining');
+    if (zombiesDisplay) {
+        zombiesDisplay.textContent = `Zombies: ${waveInfo.zombiesRemaining}`;
+    }
+    
+    // Update countdown to next wave
+    const countdownDisplay = document.getElementById('wave-countdown');
+    if (countdownDisplay) {
+        if (waveInfo.waveInProgress) {
+            countdownDisplay.style.display = 'none';
+        } else {
+            countdownDisplay.style.display = 'block';
+            countdownDisplay.textContent = `Next Wave: ${waveInfo.nextWaveCountdown}s`;
+        }
+    }
+}
+
+// Handle wave start event
+function handleWaveStart(event) {
+    const { wave, zombieCount } = event.detail;
+    
+    console.log(`Starting wave ${wave} with ${zombieCount} zombies`);
+    
+    // Add visual wave start effect
+    const waveDisplay = document.getElementById('wave-display');
+    if (waveDisplay) {
+        waveDisplay.classList.remove('wave-start');
+        void waveDisplay.offsetWidth; // Force reflow to restart animation
+        waveDisplay.classList.add('wave-start');
+    }
+    
+    // Spawn zombies for the new wave in groups around the player
+    const playerPosition = player.position.clone();
+    
+    // Determine how many spawn groups to create (more for higher waves)
+    const minGroups = 2;
+    const maxGroups = Math.min(5, 2 + Math.floor(wave / 3));
+    const spawnGroups = Math.floor(Math.random() * (maxGroups - minGroups + 1)) + minGroups;
+    
+    // Calculate zombies per group
+    const zombiesPerGroup = Math.ceil(zombieCount / spawnGroups);
+    
+    // Generate spawn positions around player
+    const spawnPositions = ZombieSystem.generateSpawnPointsAroundPlayer(
+        player, 20, 30, spawnGroups
+    );
+    
+    // Spawn zombies at each point
+    spawnPositions.forEach((position, index) => {
+        // For the last group, make sure we don't spawn more than the total count
+        const zombiesInThisGroup = (index === spawnPositions.length - 1) 
+            ? zombieCount - (index * zombiesPerGroup) 
+            : zombiesPerGroup;
+            
+        if (zombiesInThisGroup > 0) {
+            setTimeout(() => {
+                ZombieSystem.spawnZombieHorde(scene, position, zombiesInThisGroup, player);
+            }, index * 500); // Stagger spawning of groups
+        }
+    });
 }
 
 // Update the animate function to include time delta for animations
@@ -296,6 +461,9 @@ function animate(time) {
     
     // Update UI
     updateUI(ui, gameState);
+    
+    // Update wave UI
+    updateWaveUI();
     
     // Update minimap with player position, direction, obstacles and zombies
     updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies());
