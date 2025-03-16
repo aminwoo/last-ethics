@@ -64,6 +64,12 @@ export function createZombie(scene, position, type = 'REGULAR', playerRef) {
         animationTime: 0,
         targetPlayer: playerRef,
         hitTime: 0,
+        // Add knockback properties
+        knockback: {
+            velocity: new THREE.Vector3(0, 0, 0),
+            active: false,
+            decayRate: type === 'BRUTE' ? 0.85 : (type === 'RUNNER' ? 0.9 : 0.88) // Different decay rates for different zombie types
+        },
         // Increase collision radius for more effective separation
         radius: Math.max(zombieType.size.width, zombieType.size.depth) * 0.8, // Larger radius for collision
         onHit: function(damage) {
@@ -304,6 +310,22 @@ export function updateZombies(deltaTime) {
             continue;
         }
         
+        // Handle knockback effect
+        if (userData.knockback && userData.knockback.active) {
+            // Apply knockback velocity to zombie position
+            zombie.position.x += userData.knockback.velocity.x * deltaTime * 60;
+            zombie.position.z += userData.knockback.velocity.z * deltaTime * 60;
+            
+            // Decay knockback over time
+            userData.knockback.velocity.multiplyScalar(userData.knockback.decayRate);
+            
+            // Deactivate knockback when it becomes negligible
+            if (userData.knockback.velocity.length() < 0.001) {
+                userData.knockback.active = false;
+                userData.knockback.velocity.set(0, 0, 0);
+            }
+        }
+        
         // Apply hit effect (flash red)
         const timeSinceHit = currentTime - userData.hitTime;
         if (timeSinceHit < 200) {
@@ -315,6 +337,50 @@ export function updateZombies(deltaTime) {
                     child.material.emissiveIntensity = 1 - (timeSinceHit / 200);
                 }
             });
+            
+            // Add stagger effect when knocked back
+            if (userData.knockback && userData.knockback.active) {
+                // Get zombie parts to animate stagger
+                let head = zombie.getObjectByName('head');
+                let torso = zombie.getObjectByName('torso');
+                
+                // Calculate stagger amount based on knockback velocity
+                const staggerAmount = userData.knockback.velocity.length() * 5;
+                const staggerFactor = Math.min(staggerAmount, 0.5); // Limit max stagger
+                
+                // Apply stagger animation to body parts
+                if (head) {
+                    // Make the head tilt backwards when knocked back
+                    head.rotation.x = -staggerFactor * 0.8;
+                    // Add a slight tilt to the side
+                    head.rotation.z = Math.sin(currentTime * 0.02) * staggerFactor * 0.3;
+                }
+                
+                if (torso) {
+                    // Make the torso lean backwards
+                    torso.rotation.x = -staggerFactor * 0.5;
+                    // Add a slight sway
+                    torso.rotation.z = Math.sin(currentTime * 0.015) * staggerFactor * 0.2;
+                }
+                
+                // Modify leg and arm positions to simulate stumbling
+                let leftLeg = zombie.getObjectByName('leftLeg');
+                let rightLeg = zombie.getObjectByName('rightLeg');
+                let leftArm = zombie.getObjectByName('leftArm');
+                let rightArm = zombie.getObjectByName('rightArm');
+                
+                if (leftLeg && rightLeg) {
+                    leftLeg.rotation.x = Math.sin(currentTime * 0.01) * staggerFactor;
+                    rightLeg.rotation.x = -Math.sin(currentTime * 0.01) * staggerFactor;
+                }
+                
+                if (leftArm && rightArm) {
+                    leftArm.rotation.x = -Math.PI * 0.1 + Math.sin(currentTime * 0.02) * staggerFactor;
+                    rightArm.rotation.x = -Math.PI * 0.1 - Math.sin(currentTime * 0.02) * staggerFactor;
+                    leftArm.rotation.z = 0.3 + staggerFactor * 0.5;
+                    rightArm.rotation.z = -0.3 - staggerFactor * 0.5;
+                }
+            }
         } else if (timeSinceHit >= 200 && timeSinceHit < 400) {
             // Reset materials after flash
             zombie.traverse((child) => {
@@ -324,6 +390,41 @@ export function updateZombies(deltaTime) {
                     child.material.emissiveIntensity = 0;
                 }
             });
+            
+            // Reset stagger animations if knockback has ended
+            if (userData.knockback && !userData.knockback.active) {
+                // Reset all body part rotations from stagger effect
+                const head = zombie.getObjectByName('head');
+                const torso = zombie.getObjectByName('torso');
+                const leftLeg = zombie.getObjectByName('leftLeg');
+                const rightLeg = zombie.getObjectByName('rightLeg');
+                const leftArm = zombie.getObjectByName('leftArm');
+                const rightArm = zombie.getObjectByName('rightArm');
+                
+                // Smoothly reset rotations to prevent jarring transitions
+                if (head) {
+                    head.rotation.x *= 0.8;
+                    head.rotation.z *= 0.8;
+                }
+                
+                if (torso) {
+                    torso.rotation.x *= 0.8;
+                    torso.rotation.z *= 0.8;
+                }
+                
+                if (leftLeg && rightLeg) {
+                    leftLeg.rotation.x *= 0.8;
+                    rightLeg.rotation.x *= 0.8;
+                }
+                
+                if (leftArm && rightArm) {
+                    // Keep some arm rotation for zombie pose, but remove stagger effect
+                    leftArm.rotation.x = leftArm.rotation.x * 0.8 + (-Math.PI * 0.1) * 0.2;
+                    rightArm.rotation.x = rightArm.rotation.x * 0.8 + (-Math.PI * 0.1) * 0.2;
+                    leftArm.rotation.z = leftArm.rotation.z * 0.8 + 0.3 * 0.2;
+                    rightArm.rotation.z = rightArm.rotation.z * 0.8 + (-0.3) * 0.2;
+                }
+            }
         }
         
         // Move towards player if one is assigned
@@ -362,13 +463,26 @@ export function updateZombies(deltaTime) {
                 moveX += steeringForce.x;
                 moveZ += steeringForce.z;
                 
-                // Apply the combined movement
-                zombie.position.x += moveX;
-                zombie.position.z += moveZ;
+                // If not under knockback effect, apply regular movement
+                if (!userData.knockback || !userData.knockback.active) {
+                    // Apply the combined movement
+                    zombie.position.x += moveX;
+                    zombie.position.z += moveZ;
+                }
                 
                 // Update rotation to face movement direction (with some smoothing)
                 if (moveX !== 0 || moveZ !== 0) {
-                    const targetAngle = Math.atan2(moveX, moveZ);
+                    // Get movement direction (either from normal movement or from knockback)
+                    let targetAngle;
+                    
+                    if (userData.knockback && userData.knockback.active && userData.knockback.velocity.length() > 0.01) {
+                        // During knockback, face the direction we're being pushed
+                        targetAngle = Math.atan2(userData.knockback.velocity.x, userData.knockback.velocity.z);
+                    } else {
+                        // Normal movement direction
+                        targetAngle = Math.atan2(moveX, moveZ);
+                    }
+                    
                     const currentAngle = zombie.rotation.y;
                     
                     // Smoothly interpolate rotation (faster for runners, slower for brutes)
