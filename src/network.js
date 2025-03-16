@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { createPlayer, animatePlayerLegs } from './player.js';
+import SoundManager from './sound.js';
 
 // WebSocket connection and player tracking
 let socket;
@@ -464,6 +465,15 @@ function updateRemotePlayerTransform(playerObject, playerData) {
         );
     }
     
+    // Handle weapon firing
+    if (playerData.isFiring) {
+        // Create muzzle flash for remote player
+        createRemotePlayerMuzzleFlash(playerObject, playerData.weaponType);
+        
+        // Play appropriate weapon sound
+        playRemotePlayerWeaponSound(playerData.weaponType);
+    }
+    
     // Check if player is moving by comparing positions
     const isMoving = prevPosition.distanceTo(playerObject.position) > 0.01;
     
@@ -525,7 +535,7 @@ function removeRemotePlayer(playerId, scene) {
  * Send the local player's position and rotation to the server
  * @param {THREE.Object3D} playerObject - The local player object
  */
-function sendPlayerUpdate(playerObject) {
+function sendPlayerUpdate(playerObject, isFiring = false, weaponType = null) {
     if (!socket) {
         console.warn('Cannot send player update: WebSocket not initialized');
         return;
@@ -547,7 +557,9 @@ function sendPlayerUpdate(playerObject) {
             x: playerObject.rotation.x,
             y: playerObject.rotation.y,
             z: playerObject.rotation.z
-        }
+        },
+        isFiring: isFiring,
+        weaponType: weaponType
     };
     
     // Log position updates periodically (every ~3 seconds)
@@ -739,6 +751,342 @@ function updateRemotePlayer(playerData) {
         } else {
             console.error('Cannot add player - scene not available');
         }
+    }
+}
+
+/**
+ * Calculates the gun barrel position and direction for a remote player
+ * @param {THREE.Object3D} playerObject - The remote player object
+ * @param {string} weaponType - The type of weapon
+ * @returns {Object} Object containing gunTip position and direction vector
+ */
+function calculateRemotePlayerGunPosition(playerObject, weaponType) {
+    let weaponObj = null;
+    let gunTip = new THREE.Vector3();
+    let direction = new THREE.Vector3(0, 0, 1);
+    
+    // Traverse the player object to find the weapon and barrel
+    playerObject.traverse((child) => {
+        // Look for weapons based on name
+        if (child.name) {
+            const lowerName = child.name.toLowerCase();
+            
+            if ((weaponType === 'Pistol' && lowerName.includes('pistol')) ||
+                (weaponType === 'Shotgun' && lowerName.includes('shotgun')) ||
+                (weaponType === 'Assault Rifle' && lowerName.includes('assault')) ||
+                (weaponType === 'Sniper Rifle' && lowerName.includes('sniper'))) {
+                
+                weaponObj = child;
+            }
+            
+            // Look specifically for barrel objects
+            if (lowerName.includes('barrel')) {
+                // If we find a specific barrel that matches the weapon type, use it directly
+                if ((weaponType === 'Pistol' && lowerName.includes('pistol')) ||
+                    (weaponType === 'Shotgun' && lowerName.includes('shotgun')) ||
+                    (weaponType === 'Assault Rifle' && lowerName.includes('assault')) ||
+                    (weaponType === 'Sniper Rifle' && lowerName.includes('sniper'))) {
+                    
+                    // Get the world position of the barrel
+                    child.getWorldPosition(gunTip);
+                    
+                    // Get barrel direction
+                    direction.set(0, 0, 1).applyQuaternion(child.getWorldQuaternion(new THREE.Quaternion()));
+                    
+                    // We found the exact barrel, no need to continue searching
+                    return;
+                }
+            }
+        }
+    });
+    
+    // If we found a weapon object but not a specific barrel
+    if (weaponObj && gunTip.length() === 0) {
+        // Look for barrel within the weapon
+        let barrel = null;
+        weaponObj.traverse((child) => {
+            if (child.name && child.name.includes('Barrel')) {
+                barrel = child;
+            }
+        });
+        
+        if (barrel) {
+            // Get the world position of the barrel tip
+            barrel.getWorldPosition(gunTip);
+            
+            // Get barrel direction
+            direction.set(0, 0, 1).applyQuaternion(barrel.getWorldQuaternion(new THREE.Quaternion()));
+        } else {
+            // If no barrel found, use weapon object position
+            weaponObj.getWorldPosition(gunTip);
+            
+            // Get weapon direction
+            direction.set(0, 0, 1).applyQuaternion(weaponObj.getWorldQuaternion(new THREE.Quaternion()));
+        }
+    }
+    
+    // Fallback if we couldn't find any weapon or barrel
+    if (gunTip.length() === 0) {
+        // Calculate direction from player rotation
+        direction.set(0, 0, 1).applyQuaternion(playerObject.quaternion);
+        
+        // Estimate gun position based on player position
+        gunTip.copy(playerObject.position);
+        gunTip.y += 1.5; // Adjust for player height
+        
+        // Move forward and to the right to approximate gun position
+        gunTip.add(direction.clone().multiplyScalar(1.2));
+        
+        const rightVector = new THREE.Vector3(1, 0, 0);
+        rightVector.applyQuaternion(playerObject.quaternion);
+        gunTip.add(rightVector.multiplyScalar(0.3));
+    }
+
+    direction.y = 0; 
+    direction.normalize();
+    
+    return { gunTip, direction };
+}
+
+/**
+ * Creates a muzzle flash effect for a remote player
+ * @param {THREE.Object3D} playerObject - The remote player object
+ * @param {string} weaponType - The type of weapon being fired
+ */
+function createRemotePlayerMuzzleFlash(playerObject, weaponType) {
+    const scene = window.gameScene;
+    if (!scene) return;
+    
+    // Get the exact gun position and direction
+    const { gunTip, direction } = calculateRemotePlayerGunPosition(playerObject, weaponType);
+    
+    // Create a point light for muzzle flash
+    const flashLight = new THREE.PointLight(0xffff00, 2, 10);
+    
+    // Position the flash at the gun tip
+    flashLight.position.copy(gunTip);
+    
+    // Customize based on weapon type
+    switch(weaponType) {
+        case 'Shotgun':
+            flashLight.color.set(0xff8800); // Orange
+            flashLight.intensity = 3;
+            flashLight.distance = 12;
+            break;
+        case 'Assault Rifle':
+            flashLight.color.set(0xff4400); // Orange-red
+            flashLight.intensity = 2.5;
+            flashLight.distance = 8;
+            break;
+        case 'Sniper Rifle':
+            flashLight.color.set(0xffffaa); // Bright yellow
+            flashLight.intensity = 4;
+            flashLight.distance = 15;
+            break;
+        default: // Pistol or default
+            flashLight.color.set(0xffff00); // Yellow
+            flashLight.intensity = 2;
+            flashLight.distance = 6;
+    }
+    
+    // Add the flash light to the scene
+    scene.add(flashLight);
+    
+    // Remove after a short time
+    setTimeout(() => {
+        scene.remove(flashLight);
+    }, 100); // Flash lasts for 100ms
+    
+    // Create bullets for remote player
+    createRemotePlayerBullets(scene, playerObject, weaponType);
+}
+
+/**
+ * Creates bullets for a remote player when they fire
+ * @param {THREE.Scene} scene - The game scene
+ * @param {THREE.Object3D} playerObject - The remote player object
+ * @param {string} weaponType - The type of weapon being fired
+ */
+function createRemotePlayerBullets(scene, playerObject, weaponType) {
+    // Get weapon properties based on weapon type
+    let bulletColor, bulletsPerShot, bulletSpread, bulletSpeed;
+    
+    switch(weaponType) {
+        case 'Shotgun':
+            bulletColor = 0xff8800; // Orange
+            bulletsPerShot = 8;
+            bulletSpread = 0.2;
+            bulletSpeed = 0.4;
+            break;
+        case 'Assault Rifle':
+            bulletColor = 0xff0000; // Red
+            bulletsPerShot = 1;
+            bulletSpread = 0.05;
+            bulletSpeed = 0.6;
+            break;
+        case 'Sniper Rifle':
+            bulletColor = 0x00ffff; // Cyan
+            bulletsPerShot = 1;
+            bulletSpread = 0.01;
+            bulletSpeed = 1.3;
+            break;
+        default: // Pistol or default
+            bulletColor = 0xffff00; // Yellow
+            bulletsPerShot = 1;
+            bulletSpread = 0.15;
+            bulletSpeed = 1.5;
+    }
+    
+    // Get the exact gun position and direction
+    const { gunTip, direction } = calculateRemotePlayerGunPosition(playerObject, weaponType);
+    
+    // Get the bullet model from weapons.js or create a simple one if not available
+    let bulletMesh;
+    if (window.getBulletModel && window.getBulletModel()) {
+        bulletMesh = window.getBulletModel().clone();
+    } else {
+        // Create a simple bullet if the model isn't available
+        const bulletGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8);
+        bulletGeometry.rotateX(Math.PI / 2);  // Rotate to point forward
+        const bulletMaterial = new THREE.MeshStandardMaterial({ 
+            color: bulletColor,
+            emissive: bulletColor,
+            emissiveIntensity: 0.8,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        bulletMesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
+    }
+    
+    // Fire multiple bullets based on weapon type
+    for (let i = 0; i < bulletsPerShot; i++) {
+        // Clone the bullet for this shot
+        const bullet = bulletMesh.clone();
+        bullet.position.copy(gunTip);
+        
+        // Calculate direction with spread
+        let bulletDirection = direction.clone();
+        
+        // Apply spread based on weapon type
+        if (weaponType === "Shotgun") {
+            // Add spread pattern for shotgun
+            const angle = (i / bulletsPerShot) * Math.PI * 2;
+            const radius = 0.1; // Initial spread radius
+            
+            // Calculate spread offset perpendicular to direction
+            const perpX = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+            const perpY = new THREE.Vector3().crossVectors(direction, perpX).normalize();
+            
+            bullet.position.add(perpX.multiplyScalar(Math.cos(angle) * radius));
+            bullet.position.add(perpY.multiplyScalar(Math.sin(angle) * radius));
+            
+            // Add conical spread
+            const spreadAngle = bulletSpread * (1 - (i / bulletsPerShot));
+            bulletDirection.x += (Math.random() - 0.5) * spreadAngle;
+            bulletDirection.y += (Math.random() - 0.5) * spreadAngle * 0.5;
+            bulletDirection.z += (Math.random() - 0.5) * spreadAngle;
+        } else {
+            // Add random spread for other weapons
+            bulletDirection.x += (Math.random() - 0.5) * bulletSpread;
+            bulletDirection.y += (Math.random() - 0.5) * bulletSpread;
+            bulletDirection.z += (Math.random() - 0.5) * bulletSpread;
+        }
+        bulletDirection.normalize();
+        
+        // Set bullet orientation to face the direction
+        bullet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), bulletDirection);
+        
+        // Create trail for the bullet
+        const trailGeometry = new THREE.BufferGeometry();
+        const trailMaterial = new THREE.LineBasicMaterial({
+            color: bulletColor,
+            transparent: true,
+            opacity: 0.8,
+            linewidth: 2
+        });
+        
+        // Create trail points
+        const trailLength = 20;
+        const trailPositions = new Float32Array(trailLength * 3);
+        
+        // Initialize all trail positions to bullet's starting position
+        for (let j = 0; j < trailLength; j++) {
+            trailPositions[j * 3] = bullet.position.x;
+            trailPositions[j * 3 + 1] = bullet.position.y;
+            trailPositions[j * 3 + 2] = bullet.position.z;
+        }
+        
+        trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+        const trail = new THREE.Line(trailGeometry, trailMaterial);
+        scene.add(trail);
+        
+        // Add bullet light
+        const bulletLight = new THREE.PointLight(bulletColor, 0.5, 2);
+        bulletLight.position.copy(bullet.position);
+        scene.add(bulletLight);
+        
+        // Add bullet to scene
+        scene.add(bullet);
+        
+        // Calculate velocity
+        const velocity = bulletDirection.clone().multiplyScalar(
+            weaponType === "Shotgun" ? bulletSpeed * (0.7 + Math.random() * 0.3) : bulletSpeed
+        );
+        
+        // Store the bullet data for animation
+        if (window.addRemoteBullet) {
+            window.addRemoteBullet({
+                mesh: bullet,
+                light: bulletLight,
+                trail: trail,
+                trailPositions: trailPositions,
+                direction: bulletDirection,
+                velocity: velocity,
+                speed: bulletSpeed,
+                createdAt: Date.now(),
+                maxDistance: 50,
+                distance: 0
+            });
+        } else {
+            // If the global addRemoteBullet function isn't available, add a simple self-cleanup
+            // This bullet won't be animated properly but will at least be removed
+            setTimeout(() => {
+                scene.remove(bullet);
+                scene.remove(trail);
+                scene.remove(bulletLight);
+            }, 1500);
+        }
+    }
+}
+
+/**
+ * Plays weapon sounds for remote players with distance-based volume
+ * @param {string} weaponType - The type of weapon being fired
+ */
+function playRemotePlayerWeaponSound(weaponType) {
+    if (!SoundManager) return;
+    
+    // Play appropriate weapon sound at reduced volume for remote players
+    switch(weaponType) {
+        case 'Shotgun':
+            if (SoundManager.playShotgunShot) {
+                SoundManager.playShotgunShot(0.5); // 50% volume
+            }
+            break;
+        case 'Assault Rifle':
+            if (SoundManager.playRifleShot) {
+                SoundManager.playRifleShot(0.5);
+            }
+            break;
+        case 'Sniper Rifle':
+            if (SoundManager.playRifleShot) {
+                SoundManager.playRifleShot(0.5);
+            }
+            break;
+        default: // Pistol or default
+            if (SoundManager.playPistolShot) {
+                SoundManager.playPistolShot(0.5);
+            }
     }
 }
 
