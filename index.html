@@ -32,6 +32,31 @@
 			</div>
 		</div>
 		
+		<!-- Game Over Screen -->
+		<div id="game-over-screen" style="display: none;">
+			<div class="game-over-content">
+				<h1>GAME OVER</h1>
+				<h2>You have fallen</h2>
+				
+				<div class="stats-container">
+					<div class="stat-item">
+						<div class="stat-label">SCORE</div>
+						<div id="final-score" class="stat-value">0</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">ZOMBIES KILLED</div>
+						<div id="final-kills" class="stat-value">0</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">SURVIVAL TIME</div>
+						<div id="survival-time" class="stat-value">0:00</div>
+					</div>
+				</div>
+				
+				<button id="restart-game-btn">TRY AGAIN</button>
+			</div>
+		</div>
+		
 		<div id="ui-container">
 			<!-- Damage flash overlay -->
 			<div id="damage-flash"></div>
