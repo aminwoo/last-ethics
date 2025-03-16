@@ -11,7 +11,7 @@ const ZOMBIE_TYPES = {
         damage: 20,
         color: 0x2D7C3F, // Sickly green
         attackRange: 1.5,
-        attackSpeed: 1.0, // Attacks per second
+        attackSpeed: 1.0, // Attacks per secondw
         size: { width: 0.8, height: 1.8, depth: 0.5 }
     },
     RUNNER: {
@@ -1212,7 +1212,7 @@ export function damagePlayer(player, damage) {
     
     // Play hit sound if available
     try {
-        SoundManager.playSound('playerHit');
+        SoundManager.playerPlayerHit();
     } catch (error) {
         console.log('Sound effect not available');
     }
