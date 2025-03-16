@@ -20,6 +20,9 @@ const gameState = {
     currentWeaponIndex: 0,
     weapons: weapons,
     score: 0,
+    isInvulnerable: false,
+    invulnerabilityTime: 0,
+    invulnerabilityDuration: 1.0, // 1 second of invulnerability after being hit
     zombiesKilled: {
         REGULAR: 0,
         RUNNER: 0,
@@ -44,8 +47,28 @@ function updateGameState(deltaTime, keys) {
         gameState.stamina = Math.min(gameState.maxStamina, gameState.stamina + gameState.staminaRegenRate * deltaTime);
     }
     
+    // Update invulnerability state
+    if (gameState.isInvulnerable) {
+        gameState.invulnerabilityTime += deltaTime;
+        if (gameState.invulnerabilityTime >= gameState.invulnerabilityDuration) {
+            gameState.isInvulnerable = false;
+            gameState.invulnerabilityTime = 0;
+        }
+    }
+    
     // Check if any weapon is currently reloading and needs to be updated
     checkReloadCompletion(gameState);
+}
+
+// Make player invulnerable for a short period
+export function setPlayerInvulnerable() {
+    gameState.isInvulnerable = true;
+    gameState.invulnerabilityTime = 0;
+}
+
+// Check if player is currently invulnerable
+export function isPlayerInvulnerable() {
+    return gameState.isInvulnerable;
 }
 
 // Add points to the player's score
