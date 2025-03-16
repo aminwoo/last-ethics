@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import SoundManager from './sound.js';
 import { gameState, updateGameState, switchWeapon, reloadWeapon } from './gameState.js';
-import { initializeUI, updateUI, updateCrosshair } from './ui.js';
+import { initializeUI, updateUI, updateCrosshair, initializeMinimap, updateMinimap } from './ui.js';
 import { initializeInput, setupKeyboardListeners, setupMouseListeners, setupResizeListener } from './input.js';
 import { 
     initializePlayer, 
@@ -25,6 +25,8 @@ SoundManager.playRainAmbience();
 
 // Initialize UI
 const ui = initializeUI();
+// Initialize minimap
+initializeMinimap(ui);
 
 // Initialize input
 const input = initializeInput();
@@ -69,15 +71,6 @@ window.environmentObstacles = environment.obstacles || [];
 // Create player
 const player = initializePlayer(scene, gameState);
 
-// Spawn initial zombies
-function spawnInitialZombies() {
-    // Spawn a horde of zombies at different positions
-    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(10, 0, 10), 5, player);
-    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(-10, 0, -15), 5, player);
-    ZombieSystem.spawnZombieHorde(scene, new THREE.Vector3(15, 0, -10), 3, player);
-}
-
-
 setupMouseListeners(input, {
     onMouseMove: (clientMousePosition) => {
         updateCrosshair(ui, clientMousePosition);
@@ -119,7 +112,7 @@ function animate(time) {
     lastTime = time;
     
     // Update player and flashlight
-    updatePlayerAndFlashlight(deltaTime);
+    const direction = updatePlayerAndFlashlight(deltaTime);
     
     // Update rain
     updateRain(environment.rainParticles, player.position);
@@ -149,11 +142,14 @@ function animate(time) {
     // Update UI
     updateUI(ui, gameState);
     
+    // Update minimap with player position, direction, obstacles and zombies
+    updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies());
+    
     // Render scene
     renderer.render(scene, camera);
 }
 
-// Update the updatePlayerAndFlashlight function to include animation
+// Update the updatePlayerAndFlashlight function to include animation and return direction
 function updatePlayerAndFlashlight(deltaTime) {
     // Update player movement and get direction
     const direction = updatePlayerMovement(
@@ -174,6 +170,9 @@ function updatePlayerAndFlashlight(deltaTime) {
     camera.position.x = player.position.x;
     camera.position.z = player.position.z + 25;
     camera.lookAt(player.position);
+    
+    // Return direction for minimap
+    return direction;
 }
 
 // Start the animation loop

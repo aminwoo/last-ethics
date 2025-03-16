@@ -1172,7 +1172,7 @@ export function updateBullets(scene, zombies = []) {
                 const distance = bulletPos.distanceTo(zombiePos);
                 
                 // Collision radius (combined size of bullet and zombie)
-                const zombieRadius = 1.0; // Increased from 0.5 for better hit detection
+                const zombieRadius = 2.0; 
                 
                 if (distance < (bulletRadius + zombieRadius)) {
                     hitZombie = true;
