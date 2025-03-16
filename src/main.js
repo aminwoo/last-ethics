@@ -38,9 +38,6 @@ usernameInput.addEventListener('keydown', (e) => {
     }
 });
 
-// Play background ambience while on welcome screen
-SoundManager.playRainAmbience();
-
 // Variables to store initialized game objects
 let ui, input, scene, camera, renderer, raycaster, groundPlane, 
     groundIntersectPoint, environment, player;
@@ -114,7 +111,7 @@ function initializeScene() {
 initializeScene();
 
 // Function to start the game after username is entered
-function startGame() {
+async function startGame() {
     // Get the username
     const username = usernameInput.value.trim();
     
@@ -131,21 +128,37 @@ function startGame() {
     // Store username in game state
     gameState.playerName = username;
     
-    // Hide welcome screen with a fade-out effect
-    welcomeScreen.style.opacity = '0';
-    welcomeScreen.style.transition = 'opacity 1s ease-out';
-    
-    // Wait for the fade-out animation to complete
-    setTimeout(() => {
-        // Hide welcome screen
-        welcomeScreen.style.display = 'none';
+    try {
+        // Initialize audio and play ambient sounds now that we have user interaction
+        await SoundManager.playRainAmbience();
         
-        // Show UI
-        uiContainer.style.display = 'block';
+        // Hide welcome screen with a fade-out effect
+        welcomeScreen.style.opacity = '0';
+        welcomeScreen.style.transition = 'opacity 1s ease-out';
         
-        // Initialize and start the game
-        initializeGame();
-    }, 1000);
+        // Wait for the fade-out animation to complete
+        setTimeout(() => {
+            // Hide welcome screen
+            welcomeScreen.style.display = 'none';
+            
+            // Show UI
+            uiContainer.style.display = 'block';
+            
+            // Initialize and start the game
+            initializeGame();
+        }, 1000);
+    } catch (error) {
+        console.error("Failed to initialize audio:", error);
+        // Continue with the game even if audio fails
+        welcomeScreen.style.opacity = '0';
+        welcomeScreen.style.transition = 'opacity 1s ease-out';
+        
+        setTimeout(() => {
+            welcomeScreen.style.display = 'none';
+            uiContainer.style.display = 'block';
+            initializeGame();
+        }, 1000);
+    }
 }
 
 // Full game initialization and start

@@ -3,8 +3,8 @@
  * Handles loading, playing, and managing all game audio
  */
 
-// Create a single audio context for all sounds
-const audioContext = new AudioContext();
+// Create audio context lazily to avoid automatic creation
+let audioContext = null;
 
 // Sound categories
 const SOUND_CATEGORIES = {
@@ -24,6 +24,16 @@ const masterVolume = {
   [SOUND_CATEGORIES.PLAYER]: 1.0,
   [SOUND_CATEGORIES.ENEMIES]: 1.0
 };
+
+// Function to safely create and initialize the AudioContext
+function getAudioContext() {
+  if (!audioContext) {
+    // Create new AudioContext when it's first needed
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    console.log('AudioContext created with state:', audioContext.state);
+  }
+  return audioContext;
+}
 
 // Sound definitions with metadata
 const SOUNDS = {
@@ -102,8 +112,8 @@ async function initSoundSystem() {
   initializationPromise = (async () => {
     try {
       // Resume audio context if it's suspended (needed for Chrome's autoplay policy)
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
+      if (getAudioContext().state === 'suspended') {
+        await getAudioContext().resume();
       }
       
       // Load all sounds
@@ -132,7 +142,7 @@ async function loadSound(soundId, soundDef) {
       // Load using Web Audio API
       const response = await fetch(soundDef.url);
       const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const audioBuffer = await getAudioContext().decodeAudioData(arrayBuffer);
       
       loadedSounds[soundId] = {
         buffer: audioBuffer,
@@ -240,17 +250,17 @@ function playHtmlAudioSound(sound, volume, options = {}) {
  * Play a sound using Web Audio API (for advanced features)
  */
 function playWebAudioSound(sound, volume, options = {}) {
-  const source = audioContext.createBufferSource();
+  const source = getAudioContext().createBufferSource();
   source.buffer = sound.buffer;
   source.loop = options.loop !== undefined ? options.loop : sound.loop;
   
   // Create gain node for volume control
-  const gainNode = audioContext.createGain();
+  const gainNode = getAudioContext().createGain();
   gainNode.gain.value = volume;
   
   // Connect nodes
   source.connect(gainNode);
-  gainNode.connect(audioContext.destination);
+  gainNode.connect(getAudioContext().destination);
   
   // Start playback
   if (options.startTime !== undefined) {
@@ -285,7 +295,7 @@ function playWebAudioSound(sound, volume, options = {}) {
 function setupLoopWithCrossfade(sound, source, gainNode, volume) {
   const loopEnd = sound.buffer.duration - 1.0;
   const loopLength = loopEnd - (sound.loopStart || 0);
-  const nextTime = audioContext.currentTime + loopLength;
+  const nextTime = getAudioContext().currentTime + loopLength;
   
   // Store in active loops
   const loopId = Date.now().toString();
@@ -305,14 +315,14 @@ function setupLoopWithCrossfade(sound, source, gainNode, volume) {
  * Schedule the next loop iteration with crossfade
  */
 function scheduleNextLoop(sound, startTime, volume, loopId) {
-  const source = audioContext.createBufferSource();
+  const source = getAudioContext().createBufferSource();
   source.buffer = sound.buffer;
   
-  const gainNode = audioContext.createGain();
+  const gainNode = getAudioContext().createGain();
   gainNode.gain.value = volume;
   
   source.connect(gainNode);
-  gainNode.connect(audioContext.destination);
+  gainNode.connect(getAudioContext().destination);
   
   source.start(startTime, sound.loopStart || 0);
   
@@ -385,7 +395,11 @@ const SoundManager = {
   playHurt: () => playSound('HURT', { resetTime: true }),
   
   // Ambient sound shortcuts
-  playRainAmbience: () => playSound('RAIN'),
+  playRainAmbience: async () => {
+    // First ensure the sound system is initialized (creates AudioContext after user interaction)
+    await initSoundSystem();
+    return playSound('RAIN');
+  },
   playThunder: () => playSound('THUNDER'),
 
   // Categories for volume control
