@@ -492,8 +492,32 @@ function removeRemotePlayer(playerId, scene) {
             scene.remove(remotePlayer.userData.flashlight.group);
             scene.remove(remotePlayer.userData.flashlight.target);
         }
+        
+        // Find and explicitly dispose of all CSS2D objects
+        const css2DObjects = [];
+        remotePlayer.traverse((child) => {
+            if (child instanceof CSS2DObject) {
+                css2DObjects.push(child);
+                
+                // Remove the HTML element from the DOM
+                if (child.element && child.element.parentNode) {
+                    child.element.parentNode.removeChild(child.element);
+                }
+            }
+        });
+        
+        // Remove CSS2D objects from parent before removing the player
+        css2DObjects.forEach(obj => {
+            if (obj.parent) {
+                obj.parent.remove(obj);
+            }
+        });
+        
+        // Now remove the player from the scene
         scene.remove(remotePlayer);
         remotePlayers.delete(playerId);
+        
+        console.log(`Removed player ${playerId} and cleaned up ${css2DObjects.length} name tags`);
     }
 }
 

@@ -328,21 +328,25 @@ function updateMinimap(ui, playerPosition, direction, obstacles, zombies, remote
             
             // Only draw if within minimap range
             if (Math.abs(relX) < size / 2 && Math.abs(relZ) < size / 2) {
-                // Draw remote player as a blue circle with a border
+                // Get the rotation angle
+                const rotationY = remotePlayer.rotation.y;
+                
+                // Draw remote player as a triangle pointing in the direction they're facing,
+                // similar to the main player indicator but with different colors
+                ctx.save();
+                ctx.translate(relX, relZ);
+                ctx.rotate(rotationY);
+                
+                // Draw a triangle
                 ctx.beginPath();
-                ctx.arc(relX, relZ, 3, 0, Math.PI * 2);
+                ctx.moveTo(0, -4); // Tip of the triangle (forward direction)
+                ctx.lineTo(-3, 4); // Bottom left corner
+                ctx.lineTo(3, 4);  // Bottom right corner
+                ctx.closePath();
                 ctx.fill();
                 ctx.stroke();
                 
-                // Draw a small direction indicator using the player's rotation
-                const rotationY = remotePlayer.rotation.y;
-                const dirX = Math.sin(rotationY) * 5;
-                const dirZ = Math.cos(rotationY) * 5;
-                
-                ctx.beginPath();
-                ctx.moveTo(relX, relZ);
-                ctx.lineTo(relX + dirX, relZ + dirZ);
-                ctx.stroke();
+                ctx.restore();
             }
         });
     }
