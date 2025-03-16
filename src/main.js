@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import SoundManager from './sound.js';
-import { gameState, updateGameState, switchWeapon, reloadWeapon } from './gameState.js';
+import { gameState, updateGameState, switchWeapon, reloadWeapon, initializeGameState } from './gameState.js';
 import { initializeUI, updateUI, updateCrosshair, initializeMinimap, updateMinimap } from './ui.js';
 import { initializeInput, setupKeyboardListeners, setupMouseListeners, setupResizeListener } from './input.js';
 import { 
@@ -26,9 +26,12 @@ const welcomeScreen = document.getElementById('welcome-screen');
 const usernameInput = document.getElementById('username');
 const joinGameBtn = document.getElementById('join-game-btn');
 const uiContainer = document.getElementById('ui-container');
+const gameOverScreen = document.getElementById('game-over-screen');
+const restartGameBtn = document.getElementById('restart-game-btn');
 
-// Hide UI container initially
+// Hide UI container and game over screen initially
 uiContainer.style.display = 'none';
+gameOverScreen.style.display = 'none';
 
 // Welcome screen event handlers
 joinGameBtn.addEventListener('click', startGame);
@@ -37,6 +40,9 @@ usernameInput.addEventListener('keydown', (e) => {
         startGame();
     }
 });
+
+// Game over screen event handlers
+restartGameBtn.addEventListener('click', restartGame);
 
 // Variables to store initialized game objects
 let ui, input, scene, camera, renderer, raycaster, groundPlane, 
@@ -163,6 +169,9 @@ async function startGame() {
 
 // Full game initialization and start
 function initializeGame() {
+    // Initialize game state
+    initializeGameState();
+    
     // Initialize UI
     ui = initializeUI();
     // Initialize minimap
@@ -237,6 +246,13 @@ function animate(time) {
     const deltaTime = (lastTime === 0) ? 0 : (time - lastTime) / 1000;
     lastTime = time;
     
+    // Check if game is over
+    if (gameState.isGameOver) {
+        // Only render the scene but don't update game logic
+        renderer.render(scene, camera);
+        return;
+    }
+    
     // Update player and flashlight
     const direction = updatePlayerAndFlashlight(deltaTime);
     
@@ -299,4 +315,29 @@ function updatePlayerAndFlashlight(deltaTime) {
     
     // Return direction for minimap
     return direction;
+}
+
+// Function to restart the game after game over
+function restartGame() {
+    // Hide the game over screen
+    gameOverScreen.style.display = 'none';
+    
+    // Reset game state
+    initializeGameState();
+    
+    // Clear existing zombies
+    while (ZombieSystem.getZombies().length > 0) {
+        const zombie = ZombieSystem.getZombies()[0];
+        scene.remove(zombie);
+        ZombieSystem.getZombies().splice(0, 1);
+    }
+    
+    // Reset player position
+    player.position.set(0, 1, 0);
+    
+    // Reset player health and UI
+    updateUI(ui, gameState);
+    
+    // Resume game
+    console.log('Game restarted!');
 }

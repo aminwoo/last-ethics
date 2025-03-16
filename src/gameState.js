@@ -1,5 +1,6 @@
 // Game state management
 import { weapons, switchWeapon, reloadWeapon, checkReloadCompletion } from './weapons.js';
+import SoundManager from './sound.js';
 
 // Score values for different zombie types
 export const SCORE_VALUES = {
@@ -23,6 +24,9 @@ const gameState = {
     isInvulnerable: false,
     invulnerabilityTime: 0,
     invulnerabilityDuration: 1.0, // 1 second of invulnerability after being hit
+    isGameOver: false,
+    gameStartTime: 0,
+    gameEndTime: 0,
     zombiesKilled: {
         REGULAR: 0,
         RUNNER: 0,
@@ -36,8 +40,59 @@ const gameState = {
     }
 };
 
+// Initialize game state with starting time
+export function initializeGameState() {
+    // Reset health and other stats
+    gameState.health = gameState.maxHealth;
+    gameState.stamina = gameState.maxStamina;
+    gameState.isInvulnerable = false;
+    gameState.invulnerabilityTime = 0;
+    gameState.isGameOver = false;
+    gameState.score = 0;
+    gameState.zombiesKilled.REGULAR = 0;
+    gameState.zombiesKilled.RUNNER = 0;
+    gameState.zombiesKilled.BRUTE = 0;
+    gameState.gameStartTime = Date.now();
+    gameState.gameEndTime = 0;
+}
+
+// Handle game over state
+export function gameOver() {
+    if (gameState.isGameOver) return; // Prevent multiple calls
+    
+    gameState.isGameOver = true;
+    gameState.gameEndTime = Date.now();
+    
+    // Calculate survival time in seconds
+    const survivalTimeInSeconds = Math.floor((gameState.gameEndTime - gameState.gameStartTime) / 1000);
+    const minutes = Math.floor(survivalTimeInSeconds / 60);
+    const seconds = survivalTimeInSeconds % 60;
+    const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Update UI elements with final stats
+    document.getElementById('final-score').textContent = gameState.score;
+    document.getElementById('final-kills').textContent = gameState.zombiesKilled.total;
+    document.getElementById('survival-time').textContent = formattedTime;
+    
+    // Show game over screen
+    const gameOverScreen = document.getElementById('game-over-screen');
+    gameOverScreen.style.display = 'flex';
+    
+    // Try to play game over sound
+    try {
+        SoundManager.playSound('gameOver');
+    } catch (error) {
+        console.log('Sound effect not available');
+    }
+    
+    console.log('Game Over!');
+}
+
 // Update game state based on player actions
 function updateGameState(deltaTime, keys) {
+    // Skip updates if game is over
+    if (gameState.isGameOver) return;
+    
     // Update stamina based on sprinting
     if (keys.shift && (keys.w || keys.a || keys.s || keys.d)) {
         // Drain stamina when sprinting

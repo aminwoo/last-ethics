@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { recordZombieKill, gameState, setPlayerInvulnerable, isPlayerInvulnerable } from './gameState.js';
+import { recordZombieKill, gameState, setPlayerInvulnerable, isPlayerInvulnerable, gameOver } from './gameState.js';
 import SoundManager from './sound.js';
 import { showDamageFlash } from './effects.js';
 
@@ -1164,9 +1164,9 @@ export function cleanupDeadZombies(scene, delay = 10000) {
 
 // Function to apply damage to the player
 export function damagePlayer(player, damage) {
-    // Check if player is currently invulnerable
-    if (isPlayerInvulnerable()) {
-        return; // Skip damage if player is invulnerable
+    // Check if player is currently invulnerable or if game is over
+    if (isPlayerInvulnerable() || gameState.isGameOver) {
+        return; // Skip damage if player is invulnerable or game is over
     }
     
     // Reduce player health by zombie damage amount
@@ -1180,14 +1180,14 @@ export function damagePlayer(player, damage) {
     
     // Play hit sound if available
     try {
-        SoundManager.playerPlayerHit();
+        SoundManager.playSound('playerHit');
     } catch (error) {
         console.log('Sound effect not available');
     }
     
     // Check if player has died
     if (gameState.health <= 0) {
-        // You could trigger game over logic here if needed
-        console.log('Player died!');
+        // Trigger game over
+        gameOver();
     }
 } 
