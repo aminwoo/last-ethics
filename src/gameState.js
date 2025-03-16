@@ -40,8 +40,8 @@ export const WAVE_SETTINGS = {
 // Initial game state
 const gameState = {
     playerName: "Survivor", // Default player name
-    health: 100,
-    maxHealth: 100,
+    health: 10000,
+    maxHealth: 10000,
     stamina: 100,
     maxStamina: 100,
     staminaRegenRate: 10, // per second

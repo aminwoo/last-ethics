@@ -15,7 +15,7 @@ const maxThunderInterval = 15000; // Maximum time between thunders (ms)
 // Create the environment elements
 function createEnvironment(scene, camera) {
     // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0x101010); // Very dim ambient light
+    const ambientLight = new THREE.AmbientLight(0x505050); // Very dim ambient light
     scene.add(ambientLight);
 
     // Create ground plane
@@ -73,7 +73,7 @@ function createFlashlight(scene, camera) {
     scene.add(flashlightTarget); // Target needs to be in the scene for the spotlight to work
     
     // Create the flashlight
-    const flashlight = new THREE.SpotLight(0xffffff, 50, 35, Math.PI / 7, 0.5, 1);
+    const flashlight = new THREE.SpotLight(0xffffff, 75, 35, Math.PI / 7, 0.5, 1);
     flashlight.position.set(0, 1.5, 0);
     flashlight.target = flashlightTarget;
     flashlight.castShadow = true;

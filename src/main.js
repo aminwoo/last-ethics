@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import SoundManager from './sound.js';
 import { 
     gameState, 
@@ -28,6 +29,19 @@ import {
 } from './weapons.js';
 import { updateScreenShake } from './effects.js';
 import * as ZombieSystem from './zombies.js';
+// Import networking functionality
+import { 
+    initializeNetworking, 
+    sendPlayerUpdate, 
+    getRemotePlayerCount, 
+    getRemotePlayers, 
+    cleanupNetworking, 
+    updateNetworking, 
+    setPlayerName,
+    createPlayerNameTag
+} from './network.js';
+// Import chat functionality
+import { initializeChat } from './chat.js';
 
 // DOM elements
 const welcomeScreen = document.getElementById('welcome-screen');
@@ -60,12 +74,16 @@ document.addEventListener('waveStart', handleWaveStart);
 
 // Variables to store initialized game objects
 let ui, input, scene, camera, renderer, raycaster, groundPlane, 
-    groundIntersectPoint, environment, player;
+    groundIntersectPoint, environment, player, chat;
 
-// Initialize basic scene elements but don't start the game loop yet
-function initializeScene() {
+// Add a multiplayer status element to the UI
+let multiplayerStatusElement = null;
+
+// Function to initialize the scene and renderer
+async function initializeScene() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050505);
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.005);
 
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
     camera.position.set(0, 25, 0);
@@ -80,6 +98,17 @@ function initializeScene() {
 
     document.getElementById('gameContainer').appendChild(renderer.domElement);
 
+    // Initialize CSS2DRenderer for player nametags
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.getElementById('gameContainer').appendChild(labelRenderer.domElement);
+    
+    // Store the labelRenderer for use in the animation loop
+    window.labelRenderer = labelRenderer;
+
     // Create a raycaster for mouse interaction
     raycaster = new THREE.Raycaster();
     groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -90,6 +119,7 @@ function initializeScene() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
     }
 
     // Set up input handlers
@@ -116,7 +146,6 @@ function initializeScene() {
     gridHelper.position.y = 0.0;
     scene.add(gridHelper);
     
-    // Return the initialized scene
     return {
         scene,
         camera,
@@ -192,7 +221,7 @@ async function startGame() {
 }
 
 // Full game initialization and start
-function initializeGame() {
+async function initializeGame() {
     // Initialize game state
     initializeGameState();
     
@@ -209,22 +238,63 @@ function initializeGame() {
 
     // Make obstacles available globally for zombie collision detection
     window.environmentObstacles = environment.obstacles || [];
+    
+    // Make scene globally available for network code
+    window.gameScene = scene;
 
     // Create player
     player = initializePlayer(scene, gameState);
+
+    // Make gameState available globally for network code
+    window.gameState = gameState;
+
+    // Initialize multiplayer networking
+    try {
+        await initializeNetworking((playerCount) => {
+            updateMultiplayerStatus(playerCount);
+        }, scene);
+        console.log('Networking initialized successfully');
+        
+        // Send player name to the server
+        if (gameState.playerName) {
+            setPlayerName(gameState.playerName);
+        }
+        
+        // Initialize chat after networking is set up
+        chat = initializeChat();
+        
+    } catch (error) {
+        console.error('Failed to initialize networking:', error);
+        // Continue with single-player mode if networking fails
+    }
 
     // Set up mouse listeners for crosshair and shooting
     setupMouseListeners(input, {
         onMouseMove: (clientMousePosition) => {
             updateCrosshair(ui, clientMousePosition);
         },
-        onMouseClick: () => handleShooting(input, player, scene, gameState)
+        onMouseClick: () => {
+            // Only allow shooting if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                handleShooting(input, player, scene, gameState);
+            }
+        }
     });
 
     // Set up keyboard listeners for weapon switching and reloading
     setupKeyboardListeners(input, {
-        onReload: () => handleReload(player, reloadWeapon, gameState),
-        onWeaponSwitch: (weaponIndex) => handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState)
+        onReload: () => {
+            // Only allow reloading if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                handleReload(player, reloadWeapon, gameState);
+            }
+        },
+        onWeaponSwitch: (weaponIndex) => {
+            // Only allow weapon switching if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState);
+            }
+        }
     });
 
     // Create wave display UI if it doesn't exist
@@ -235,6 +305,9 @@ function initializeGame() {
     
     // Add Z key for spawning zombies (for debugging/testing)
     window.addEventListener('keydown', (event) => {
+        // Skip if typing in chat
+        if (chat && chat.isTyping()) return;
+        
         // Z key to spawn more zombies around the player
         if (event.key.toLowerCase() === 'z') {
             const playerPosition = player.position.clone();
@@ -292,57 +365,7 @@ function createWaveUI() {
     // Add to UI container
     uiContainer.appendChild(wavePanel);
     
-    // Create style for wave panel if needed
-    const style = document.createElement('style');
-    style.textContent = `
-        #wave-panel {
-            position: absolute;
-            top: 20px;
-            right: 50%;
-            transform: translateX(50%);
-            margin-top: 60px;
-            background-color: rgba(0, 20, 40, 0.6);
-            backdrop-filter: blur(8px);
-            box-shadow: 0 0 20px rgba(0, 100, 255, 0.3), inset 0 0 15px rgba(0, 150, 255, 0.2);
-            border: 1px solid rgba(0, 150, 255, 0.3);
-            border-radius: 8px;
-            padding: 10px 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            pointer-events: none;
-        }
-        
-        .wave-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 18px;
-            color: #00ccff;
-            text-shadow: 0 0 10px rgba(0, 200, 255, 0.7);
-            margin: 5px 0;
-            letter-spacing: 1px;
-        }
-        
-        #wave-display {
-            font-weight: 700;
-            font-size: 22px;
-        }
-        
-        #wave-countdown {
-            color: #ffaa00;
-            text-shadow: 0 0 10px rgba(255, 150, 0, 0.7);
-        }
-        
-        @keyframes wave-pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-        
-        .wave-start {
-            animation: wave-pulse 0.5s ease;
-        }
-    `;
-    document.head.appendChild(style);
+    // Note: Styles are now in /public/css/game-ui.css
 }
 
 // Update wave UI elements
@@ -425,6 +448,10 @@ function animate(time) {
     const deltaTime = (lastTime === 0) ? 0 : (time - lastTime) / 1000;
     lastTime = time;
     
+    // Increment frame count
+    gameState.frameCount++;
+    gameState.gameTime += deltaTime;
+    
     // Check if game is over
     if (gameState.isGameOver) {
         // Only render the scene but don't update game logic
@@ -434,6 +461,9 @@ function animate(time) {
     
     // Update player and flashlight
     const direction = updatePlayerAndFlashlight(deltaTime);
+    
+    // Update networking debug display
+    updateNetworking();
     
     // Update rain
     updateRain(environment.rainParticles, player.position);
@@ -466,15 +496,23 @@ function animate(time) {
     // Update wave UI
     updateWaveUI();
     
-    // Update minimap with player position, direction, obstacles and zombies
-    updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies());
+    // Update minimap with player position, direction, obstacles, zombies and remote players
+    updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
     
     // Render scene
     renderer.render(scene, camera);
+    
+    // Render CSS2D labels (name tags)
+    if (window.labelRenderer) {
+        window.labelRenderer.render(scene, camera);
+    }
 }
 
-// Update the updatePlayerAndFlashlight function to include animation and return direction
+// Update the updatePlayerAndFlashlight function to send position updates to the server
 function updatePlayerAndFlashlight(deltaTime) {
+    // Don't update movement if typing in chat
+    const isTypingInChat = chat && chat.isTyping();
+    
     // Update player movement and get direction
     const direction = updatePlayerMovement(
         player, 
@@ -484,8 +522,19 @@ function updatePlayerAndFlashlight(deltaTime) {
         raycaster, 
         groundPlane, 
         groundIntersectPoint, 
-        { camera }
+        { camera },
+        isTypingInChat // Pass typing state to prevent movement while typing
     );
+    
+    // Send player position update to server
+    // More frequent updates in the first 5 seconds to ensure initial position is set
+    const shouldSendUpdate = gameState.gameTime < 5.0 ? 
+        (gameState.frameCount % 2 === 0) : // Every 2 frames during first 5 seconds
+        (gameState.frameCount % 6 === 0);  // Every 6 frames after that
+    
+    if (shouldSendUpdate) {
+        sendPlayerUpdate(player);
+    }
     
     // Update flashlight
     updateFlashlight(environment.flashlight, player.position, direction);
@@ -501,15 +550,26 @@ function updatePlayerAndFlashlight(deltaTime) {
 
 // Function to restart the game after game over
 function restartGame() {
-    // Only allow one click on the restart button
-    restartGameBtn.disabled = true;
-    restartGameBtn.style.opacity = '0.6';
-    restartGameBtn.style.cursor = 'not-allowed';
-    restartGameBtn.textContent = 'RESTARTING...';
+    // Clean up resources
+    cleanupResources();
     
-    // Hide the game over screen
-    gameOverScreen.style.display = 'none';
+    // Reset game state
+    resetGame();
     
+    // Start new game
+    startGame();
+}
+
+
+// Function to update the multiplayer status display
+function updateMultiplayerStatus(remotePlayerCount) {
+    if (multiplayerStatusElement) {
+        multiplayerStatusElement.textContent = `${remotePlayerCount + 1}`; // +1 for local player
+    }
+}
+
+// Function to clean up resources when restarting or exiting the game
+function cleanupResources() {
     // Reset game state
     initializeGameState();
     
@@ -537,6 +597,6 @@ function restartGame() {
         restartGameBtn.textContent = 'TRY AGAIN';
     }, 1000);
     
-    // Resume game
-    console.log('Game restarted!');
+    // Clean up networking resources
+    cleanupNetworking();
 }

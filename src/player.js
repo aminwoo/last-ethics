@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import SoundManager from './sound.js';
 import * as Weapons from './weapons.js';
+import { sendPlayerUpdate } from './network.js';
 
 // Player movement speed
 const PLAYER_SPEED = 0.07;
@@ -8,6 +9,7 @@ const PLAYER_SPRINT_MULTIPLIER = 1.5;
 
 function createPlayer() {
     const player = new THREE.Group();
+    player.name = 'player'; // Set a name to easily find the player object
     
     // Body
     const bodyGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1.2, 16);
@@ -244,21 +246,24 @@ function animatePlayerLegs(player, isMoving, deltaTime, isShiftPressed) {
 }
 
 // Update player movement and animation
-function updatePlayerMovement(player, input, gameState, deltaTime, raycaster, groundPlane, groundIntersectPoint, flashlight) {
+function updatePlayerMovement(player, input, gameState, deltaTime, raycaster, groundPlane, groundIntersectPoint, flashlight, isTyping = false) {
     // Calculate movement direction based on keys
     let moveX = 0;
     let moveZ = 0;
     
-    if (input.keys.w) moveZ -= 1;
-    if (input.keys.s) moveZ += 1;
-    if (input.keys.a) moveX -= 1;
-    if (input.keys.d) moveX += 1;
+    // Don't move if typing in chat
+    if (!isTyping) {
+        if (input.keys.w) moveZ -= 1;
+        if (input.keys.s) moveZ += 1;
+        if (input.keys.a) moveX -= 1;
+        if (input.keys.d) moveX += 1;
+    }
     
     // Check if player is moving
     const isMoving = (moveX !== 0 || moveZ !== 0);
     
     // Animate player legs
-    animatePlayerLegs(player, isMoving, deltaTime, input.keys.shift);
+    animatePlayerLegs(player, isMoving, deltaTime, input.keys.shift && !isTyping);
     
     // Normalize movement vector if moving diagonally
     if (moveX !== 0 && moveZ !== 0) {
@@ -269,8 +274,8 @@ function updatePlayerMovement(player, input, gameState, deltaTime, raycaster, gr
     
     // Apply movement speed
     let speed = PLAYER_SPEED;
-    // Only allow sprinting if there's stamina available
-    if (input.keys.shift && gameState.stamina > 0) {
+    // Only allow sprinting if there's stamina available and not typing
+    if (input.keys.shift && gameState.stamina > 0 && !isTyping) {
         speed *= PLAYER_SPRINT_MULTIPLIER;
     }
     
@@ -291,6 +296,8 @@ function updatePlayerMovement(player, input, gameState, deltaTime, raycaster, gr
     if (direction.x !== 0 || direction.z !== 0) {
         player.rotation.y = Math.atan2(direction.x, direction.z);
     }
+
+    sendPlayerUpdate(player);
     
     return direction;
 }

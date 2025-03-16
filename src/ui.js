@@ -246,7 +246,7 @@ function updateCrosshair(ui, clientMousePosition) {
 }
 
 // Update minimap
-function updateMinimap(ui, playerPosition, direction, obstacles, zombies) {
+function updateMinimap(ui, playerPosition, direction, obstacles, zombies, remotePlayers) {
     const ctx = ui.minimap.context;
     const scale = ui.minimap.scale;
     const size = ui.minimap.size;
@@ -311,6 +311,38 @@ function updateMinimap(ui, playerPosition, direction, obstacles, zombies) {
                     width,
                     height
                 );
+            }
+        });
+    }
+    
+    // Draw remote players if provided
+    if (remotePlayers && remotePlayers.size > 0) {
+        // Use a bright blue color for remote players
+        ctx.fillStyle = 'rgba(0, 150, 255, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 100, 200, 1.0)';
+        ctx.lineWidth = 1;
+        
+        remotePlayers.forEach((remotePlayer) => {
+            const relX = (remotePlayer.position.x - playerPosition.x) * scale;
+            const relZ = (remotePlayer.position.z - playerPosition.z) * scale;
+            
+            // Only draw if within minimap range
+            if (Math.abs(relX) < size / 2 && Math.abs(relZ) < size / 2) {
+                // Draw remote player as a blue circle with a border
+                ctx.beginPath();
+                ctx.arc(relX, relZ, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Draw a small direction indicator using the player's rotation
+                const rotationY = remotePlayer.rotation.y;
+                const dirX = Math.sin(rotationY) * 5;
+                const dirZ = Math.cos(rotationY) * 5;
+                
+                ctx.beginPath();
+                ctx.moveTo(relX, relZ);
+                ctx.lineTo(relX + dirX, relZ + dirZ);
+                ctx.stroke();
             }
         });
     }
