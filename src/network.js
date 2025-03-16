@@ -221,7 +221,7 @@ function initializeNetworking(playerUpdatedCallback, scene) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname || 'localhost';
     const port = 3000; // Match the server port
-    const wsUrl = 'https://4cf319eabd46.ngrok.app'; // `${protocol}//${host}:${port}`;
+    const wsUrl = 'https://last-ethics-server.onrender.com'; // `${protocol}//${host}:${port}`;
     
     console.log(`Attempting to connect to WebSocket server at: ${wsUrl}`);
     
