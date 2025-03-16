@@ -1,4 +1,5 @@
 // UI management for the game
+import { getScoreInfo } from './gameState.js';
 
 // Get UI elements from the DOM
 function initializeUI() {
@@ -10,6 +11,8 @@ function initializeUI() {
         ammoCounter: document.getElementById('ammo-counter'),
         crosshair: document.getElementById('crosshair'),
         weaponImage: document.getElementById('weapon-image'),
+        scoreDisplay: document.getElementById('score-display'),
+        killCounter: document.getElementById('kill-counter'),
         minimap: {
             container: document.getElementById('minimap'),
             canvas: document.getElementById('minimap-canvas'),
@@ -163,6 +166,26 @@ function updateUI(ui, gameState) {
     // Update weapon info
     ui.weaponName.textContent = gameState.weapon.name;
     
+    // Update score information
+    const scoreInfo = getScoreInfo();
+    if (ui.scoreDisplay) {
+        // Check if score has changed and animate if it has
+        if (ui.lastScore !== undefined && ui.lastScore !== scoreInfo.score) {
+            animateScoreChange(ui.scoreDisplay);
+        }
+        ui.lastScore = scoreInfo.score;
+        ui.scoreDisplay.textContent = `Score: ${scoreInfo.score}`;
+    }
+    
+    if (ui.killCounter) {
+        // Check if kill count has changed and animate if it has
+        if (ui.lastKills !== undefined && ui.lastKills !== scoreInfo.kills.total) {
+            animateScoreChange(ui.killCounter);
+        }
+        ui.lastKills = scoreInfo.kills.total;
+        ui.killCounter.textContent = `Kills: ${scoreInfo.kills.total} (R:${scoreInfo.kills.REGULAR} | S:${scoreInfo.kills.RUNNER} | B:${scoreInfo.kills.BRUTE})`;
+    }
+    
     // Check if weapon is reloading
     if (gameState.weapon.isReloading) {
         // Show RELOADING text instead of ammo counter
@@ -190,6 +213,18 @@ function updateUI(ui, gameState) {
     
     // Update weapon image
     ui.weaponImage.src = gameState.weapon.image;
+}
+
+// Animate score element when points are earned
+function animateScoreChange(element) {
+    // Remove the animation class if it's already there
+    element.classList.remove('score-pulse');
+    
+    // Force a reflow to restart the animation
+    void element.offsetWidth;
+    
+    // Add the animation class back
+    element.classList.add('score-pulse');
 }
 
 // Update crosshair position

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { recordZombieKill } from './gameState.js';
 
 // Zombie types with different characteristics
 const ZOMBIE_TYPES = {
@@ -83,6 +84,7 @@ export function createZombie(scene, position, type = 'REGULAR', playerRef) {
                 this.animationState = 'dying';
                 this.animationTime = 0;
                 // Play death sound
+                recordZombieKill(this.zombieType);
             } else {
                 // Play hit sound
             }
