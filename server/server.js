@@ -200,7 +200,35 @@ wss.on('connection', (ws, req) => {
                             });
                         }
                     }
-                    break;    
+                    break;
+                
+                // Handle player death
+                case 'playerDeath':
+                    const player = players.get(playerId);
+                    if (player) {
+                        // Mark the player as dead
+                        player.isDead = true;
+                        
+                        console.log(`Player ${playerId} (${player.name}) has died`);
+                        
+                        // Broadcast death to all other players
+                        broadcastToOthers(ws, {
+                            type: 'playerDied',
+                            playerId: playerId,
+                            playerName: player.name || `Player ${playerId}`
+                        });
+                        
+                        // Send system message about player death
+                        broadcast({
+                            type: 'chat',
+                            playerId: 'system',
+                            playerName: 'System',
+                            message: `${player.name || `Player ${playerId}`} has died`,
+                            timestamp: Date.now(),
+                            isSystem: true
+                        });
+                    }
+                    break;
                     
                 default:
                     console.log(`Unknown message type from player ${playerId}: ${data.type}`);

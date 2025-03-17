@@ -466,6 +466,9 @@ export function updatePlayerArmsForWeapon(player, gameState) {
 
 // Function to handle weapon switching
 export function handleWeaponSwitch(player, weaponIndex, switchWeaponFn, gameState) {
+    // Check if we're switching from an Assault Rifle
+    const isLeavingAssaultRifle = gameState.weapon.name === "Assault Rifle";
+    
     // Use the imported switchWeapon function
     if (switchWeaponFn(gameState, weaponIndex)) {
         // Update player model to reflect the new weapon
@@ -476,10 +479,26 @@ export function handleWeaponSwitch(player, weaponIndex, switchWeaponFn, gameStat
             SoundManager.playWeaponSwitch();
         }
         
+        // If we were using an Assault Rifle, stop the SMG sound
+        if (isLeavingAssaultRifle) {
+            stopSmgSound();
+        }
+        
         return true;
     }
     
     return false;
+}
+
+// Function to stop the SMG sound
+export function stopSmgSound() {
+    // Reset firing flag
+    isSmgFiring = false;
+    
+    // Stop the looping sound
+    if (SoundManager.stopLoop) {
+        SoundManager.stopLoop('SMG_SHOT');
+    }
 }
 
 // Function to handle weapon reloading
@@ -743,8 +762,10 @@ export function handleShooting(input, player, scene, gameState) {
         
         if (weapon.name === "Shotgun" && SoundManager.playShotgunShot) {
             SoundManager.playShotgunShot();
-        } else if (weapon.name === "Assault Rifle" && SoundManager.playRifleShot) {
-            SoundManager.playRifleShot();
+        } else if (weapon.name === "Assault Rifle" && SoundManager.playSmgShot) {
+            // Set flag to indicate SMG is firing to help with sound management
+            isSmgFiring = true;
+            SoundManager.playSmgShot();
         } else if (weapon.name === "Sniper Rifle" && SoundManager.playRifleShot) {
             SoundManager.playRifleShot();
 

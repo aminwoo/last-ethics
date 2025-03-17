@@ -27,10 +27,17 @@ import {
     updateBullets,
     resetBullets,
     getBulletModel,
-    addRemoteBullet
+    addRemoteBullet,
+    stopSmgSound
 } from './weapons.js';
 import { updateScreenShake } from './effects.js';
 import * as ZombieSystem from './zombies.js';
+// Import turret functionality
+import {
+    createSpawnTurrets,
+    updateTurrets,
+    cleanupTurrets
+} from './turrets.js';
 // Import networking functionality
 import { 
     initializeNetworking, 
@@ -80,6 +87,9 @@ let ui, input, scene, camera, renderer, raycaster, groundPlane,
 
 // Add a multiplayer status element to the UI
 let multiplayerStatusElement = null;
+
+// Add a variable for the turrets
+let turrets = [];
 
 // Function to initialize the scene and renderer
 async function initializeScene() {
@@ -246,6 +256,10 @@ async function initializeGame() {
 
     // Create player
     player = initializePlayer(scene, gameState);
+
+    // Create turrets at player spawn position
+    turrets = createSpawnTurrets(scene, player.position);
+    console.log(`Created ${turrets.length} automatic turrets near player spawn`);
 
     // Make gameState available globally for network code
     window.gameState = gameState;
@@ -454,67 +468,97 @@ function handleWaveStart(event) {
 let lastTime = 0;
 
 function animate(time) {
-    const deltaTime = (lastTime === 0) ? 0 : (time - lastTime) / 1000;
+    const deltaTime = (lastTime === 0) ? 0 : Math.min(0.05, (time - lastTime) / 1000);
     lastTime = time;
     
     // Increment frame count
     gameState.frameCount++;
     gameState.gameTime += deltaTime;
-    
+
     // Check if game is over
-    if (gameState.isGameOver) {
-        // Only render the scene but don't update game logic
-        renderer.render(scene, camera);
+    if (gameState.health <= 0 && !gameState.gameOver) {
+        handleGameOver();
         return;
     }
     
-    // Update player and flashlight
-    const direction = updatePlayerAndFlashlight(deltaTime);
-    
-    // Update networking debug display
-    updateNetworking();
-    
-    // Update rain
-    updateRain(environment.rainParticles, player.position);
+    // Skip rendering if game over
+    if (gameState.gameOver) {
+        return;
+    }
     
     // Update game state
     updateGameState(deltaTime, input.keys);
     
-    // Handle automatic weapons firing
+    // Handle automatic weapon firing if mouse is held down
     if (input.mouseDown && gameState.weapon && gameState.weapon.isAutomatic) {
-        handleShooting(input, player, scene, gameState);
+        // Only attempt to fire if not typing in chat
+        if (!chat || !chat.isTyping()) {
+            handleShooting(input, player, scene, gameState);
+        }
     }
-        
+    // Stop the assault rifle sound when mouse button is released
+    else if (!input.mouseDown && gameState.weapon && gameState.weapon.name === "Assault Rifle") {
+        // Stop the SMG sound
+        stopSmgSound();
+    }
+    
+    // Update player movement and direction
+    const direction = updatePlayerAndFlashlight(deltaTime);
+    
     // Update bullets
     updateBullets(scene, ZombieSystem.getZombies());
     
-    // Update zombies with delta time
-    ZombieSystem.updateZombies(deltaTime);
-    
-    // Periodically cleanup dead zombies
-    if (Math.random() < 0.01) { // Check roughly every 100 frames
-        ZombieSystem.cleanupDeadZombies(scene);
-    }
-
-    // Apply screen shake effect
+    // Update screen shake
     updateScreenShake(camera);
     
-    // Update UI
+    // Update zombies
+    ZombieSystem.updateZombies(deltaTime);
+    
+    // Update turrets to target and shoot zombies
+    updateTurrets(deltaTime, scene, ZombieSystem.getZombies());
+    
+    // Periodically cleanup dead zombies
+    if (gameState.frameCount % 120 === 0) {
+        ZombieSystem.cleanupDeadZombies(scene);
+    }
+    
+    // Apply screen shake effect if enabled
+    if (gameState.screenShake > 0) {
+        // Apply screen shake
+        const shakeIntensity = gameState.screenShake;
+        camera.position.x += (Math.random() - 0.5) * shakeIntensity * 0.1;
+        camera.position.y += (Math.random() - 0.5) * shakeIntensity * 0.1;
+        camera.position.z += (Math.random() - 0.5) * shakeIntensity * 0.1;
+        
+        // Decay screen shake
+        gameState.screenShake *= 0.9;
+        if (gameState.screenShake < 0.01) {
+            gameState.screenShake = 0;
+        }
+    }
+    
+    // Update UI elements
     updateUI(ui, gameState);
     
     // Update wave UI
     updateWaveUI();
     
-    // Update minimap with player position, direction, obstacles, zombies and remote players
-    updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
+    // Update minimap
+    if (direction) {
+        updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
+    }
     
-    // Render scene
+    // Update networking (update other players, send position updates)
+    updateNetworking();
+    
+    // Update rain if active
+    updateRain(environment.rainParticles, player.position);
+    
+    // Always render even when not focused (shows last frame)
     renderer.render(scene, camera);
     
-    // Render CSS2D labels (name tags)
-    if (window.labelRenderer) {
-        window.labelRenderer.render(scene, camera);
-    }
+    // Update labels renderer
+    window.labelRenderer.render(scene, camera);
 }
 
 // Update the updatePlayerAndFlashlight function to send position updates to the server
@@ -586,6 +630,9 @@ function cleanupResources() {
     
     // Reset bullets before clearing zombies
     resetBullets(scene);
+    
+    // Clean up turrets
+    cleanupTurrets(scene);
     
     // Clear existing zombies
     while (ZombieSystem.getZombies().length > 0) {
