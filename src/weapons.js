@@ -2,10 +2,6 @@ import * as THREE from 'three';
 import SoundManager from './sound.js';
 import { applyScreenShake } from './effects.js';
 
-// SMG sound implementation
-let smgShotSound = new Audio('./assets/sounds/smg.mp3');
-let isSmgFiring = false;
-
 export const weapons = [
     {
         name: "Pistol",
@@ -733,15 +729,6 @@ export function handleShooting(input, player, scene, gameState) {
     // Check if weapon is currently reloading
     if (weapon.isReloading) {
         // If we're reloading the assault rifle, stop the sound
-        if (weapon.name === "Assault Rifle" && isSmgFiring) {
-            stopSmgSound();
-            
-            // Send a network update to inform other clients we've stopped firing
-            if (window.sendPlayerUpdate) {
-                window.sendPlayerUpdate(player, false, weapon.name);
-                console.log("Sent stop firing update for Assault Rifle (during reloading)");
-            }
-        }
         return false;
     }
     
@@ -761,23 +748,6 @@ export function handleShooting(input, player, scene, gameState) {
         
         if (weapon.name === "Shotgun" && SoundManager.playShotgunShot) {
             SoundManager.playShotgunShot();
-        } else if (weapon.name === "Assault Rifle") {
-            // For assault rifle, use our custom audio element
-            /*if (!isSmgFiring) {
-                try {
-                    smgShotSound.currentTime = 0;
-                    smgShotSound.play()
-                        .catch(error => console.error("Error playing SMG sound:", error));
-                    isSmgFiring = true;saaaaaaa
-                    console.log("Started SMG sound");
-                } catch (error) {
-                    console.error("Failed to play SMG sound:", error);
-                    // Fallback to SoundManager if our custom approach fails
-                    if (SoundManager.playSmgShot) {
-                        SoundManager.playSmgShot();
-                    }
-                }
-            }*/
         } else if (weapon.name === "Sniper Rifle" && SoundManager.playRifleShot) {
             SoundManager.playRifleShot();
         } else if (SoundManager.playPistolShot) {
@@ -805,17 +775,6 @@ export function handleShooting(input, player, scene, gameState) {
         
         return true;
     } else if (weapon.ammo <= 0) {
-        // If we're out of ammo with the assault rifle, stop the sound
-        if (weapon.name === "Assault Rifle" && isSmgFiring) {
-            stopSmgSound();
-            
-            // Send a network update to inform other clients we've stopped firing
-            if (window.sendPlayerUpdate) {
-                window.sendPlayerUpdate(player, false, weapon.name);
-                console.log("Sent stop firing update for Assault Rifle (out of ammo)");
-            }
-        }
-        
         // Play empty gun sound (if available)
         if (SoundManager.playEmptyClip) {
             SoundManager.playEmptyClip();
@@ -994,8 +953,6 @@ function shootBullet(input, weapon, player, scene) {
     if (SoundManager) {
         if (weapon.name === "Shotgun" && SoundManager.playShotgunShot) {
             SoundManager.playShotgunShot();
-        } else if (weapon.name === "Assault Rifle" && SoundManager.playRifleShot) {
-            SoundManager.playRifleShot();
         } else if (weapon.name === "Sniper Rifle" && SoundManager.playRifleShot) {
             SoundManager.playRifleShot();
         } else if (SoundManager.playPistolShot) {
@@ -1059,17 +1016,6 @@ function shootBullet(input, weapon, player, scene) {
     // Find where the ray intersects the gun-height plane
     raycaster.ray.intersectPlane(gunHeightPlane, targetPoint);
     
-    // If we found an intersection point, use it; otherwise create a fallback
-    if (targetPoint.lengthSq() > 0) {
-        console.log("Target point from raycasting (at gun height):", targetPoint);
-    } else {
-        // Fallback if no intersection - project a point far in the ray direction
-        targetPoint = raycaster.ray.origin.clone().add(
-            raycaster.ray.direction.clone().multiplyScalar(100)
-        );
-        targetPoint.y = gunTip.y; // Force to gun tip height
-        console.log("Using fallback target point (at gun height):", targetPoint);
-    }
     
     // Get direction from gun tip to target point
     initialDirection.subVectors(targetPoint, gunTip);
@@ -1462,13 +1408,6 @@ export function resetBullets(scene) {
     bulletModel = null;
 }
 
-// Function to stop the SMG sound
-export function stopSmgSound() {
-    smgShotSound.pause();
-    smgShotSound.currentTime = 0;
-    isSmgFiring = false;
-    console.log("Stopped SMG sound");
-}
 
 // Function to create a special effect when a sniper bullet pierces through a zombie
 function createPiercingEffect(bullet, zombie, scene) {
