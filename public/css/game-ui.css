@@ -638,3 +638,117 @@ body {
 .player-nametag.remote {
     background-color: rgba(30, 50, 100, 0.8);
 }
+
+/* Chat UI Styles */
+.chat-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    z-index: 1000;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.chat-messages {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-message {
+    margin-bottom: 8px;
+    word-wrap: break-word;
+    animation: fadeIn 0.3s ease;
+}
+
+.chat-message.system {
+    color: #ffcc00;
+    font-style: italic;
+    font-size: 13px;
+}
+
+.chat-message.self {
+    color: #66ffcc;
+}
+
+.chat-message .sender {
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+.chat-message .timestamp {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 5px;
+}
+
+.chat-form {
+    display: flex;
+    gap: 5px;
+}
+
+.chat-input {
+    flex: 1;
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: white;
+    outline: none;
+}
+
+.chat-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.chat-send-btn {
+    background-color: rgba(100, 200, 255, 0.7);
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.chat-send-btn:hover {
+    background-color: rgba(100, 200, 255, 0.9);
+}
+
+.chat-hidden {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.chat-active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.chat-fading {
+    opacity: 0.6;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

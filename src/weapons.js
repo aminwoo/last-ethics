@@ -507,7 +507,6 @@ export function createMuzzleFlash(player, scene) {
     let currentWeapon = 'pistol';
     
     if (!userData || !userData.weapons) {
-        console.warn("Player userData or weapons not found for muzzle flash");
         return; // Exit early if userData isn't valid
     }
     
@@ -663,7 +662,6 @@ export function createMuzzleFlash(player, scene) {
                     }
                 }
             } catch (error) {
-                console.error("Error animating muzzle flash:", error);
                 // Attempt cleanup
                 if (gunBarrel && muzzleFlashGroup.parent) {
                     gunBarrel.remove(muzzleFlashGroup);
@@ -681,7 +679,7 @@ export function createMuzzleFlash(player, scene) {
                     gunBarrel.remove(muzzleFlashGroup);
                 }
             } catch (error) {
-                console.error("Error removing muzzle flash:", error);
+                // Error removing muzzle flash
             }
         }, 100);
     } else {
@@ -720,7 +718,7 @@ export function createMuzzleFlash(player, scene) {
                 scene.remove(flashGroup);
             }, 100);
         } catch (error) {
-            console.error("Error creating fallback muzzle flash:", error);
+            // Error creating fallback muzzle flash
         }
     }
 }
@@ -739,7 +737,6 @@ export function handleShooting(input, player, scene, gameState) {
             // Send a network update to inform other clients we've stopped firing
             if (window.sendPlayerUpdate) {
                 window.sendPlayerUpdate(player, false, weapon.name);
-                console.log("Sent stop firing update for Assault Rifle (during reloading)");
             }
         }
         return false;
@@ -812,7 +809,6 @@ export function handleShooting(input, player, scene, gameState) {
             // Send a network update to inform other clients we've stopped firing
             if (window.sendPlayerUpdate) {
                 window.sendPlayerUpdate(player, false, weapon.name);
-                console.log("Sent stop firing update for Assault Rifle (out of ammo)");
             }
         }
         
@@ -1290,11 +1286,11 @@ export function updateBullets(scene, zombies = []) {
                         zombie.health -= bullet.damage;
                         damageApplied = true;
                     } else {
-                        console.warn("Zombie hit but no way to apply damage was found");
+                        // Error: Zombie hit but no way to apply damage was found
                     }
                     
                     if (damageApplied) {
-                        console.log(`Zombie hit! Damage: ${bullet.damage}, Knockback: ${knockbackAmount.toFixed(2)}`);
+                        // Log: Zombie hit! Damage: ${bullet.damage}, Knockback: ${knockbackAmount.toFixed(2)}
                     }
                     
                     // For piercing bullets, track the zombie and increment pierce count
@@ -1418,7 +1414,6 @@ export function getBulletModel() {
 // Add a remote player bullet to be updated
 export function addRemoteBullet(bullet) {
     if (!bullet || !bullet.mesh) {
-        console.warn("Tried to add invalid remote bullet");
         return;
     }
     
@@ -1467,7 +1462,6 @@ export function stopSmgSound() {
     smgShotSound.pause();
     smgShotSound.currentTime = 0;
     isSmgFiring = false;
-    console.log("Stopped SMG sound");
 }
 
 // Function to create a special effect when a sniper bullet pierces through a zombie
