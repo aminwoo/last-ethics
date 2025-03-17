@@ -85,7 +85,9 @@ export const weapons = [
         spread: 0.01, 
         bulletSpeed: 1.3,
         shakeIntensity: 0.4,
-    }
+        canPierce: true,
+        maxPierceCount: 3
+    },
 ];
 
 let bullets = [];
@@ -1107,13 +1109,18 @@ function shootBullet(input, weapon, player, scene) {
         
         // Create bullet trail with higher visibility
         const trailGeometry = new THREE.BufferGeometry();
+        
+        // Enhanced trail material for sniper rifle
         const trailMaterial = new THREE.LineBasicMaterial({
             color: bulletColor,
             transparent: true,
-            opacity: 0.8,
-            linewidth: 2
+            opacity: weapon.name === "Sniper Rifle" ? 0.9 : 0.8, // Higher opacity for sniper
+            linewidth: weapon.name === "Sniper Rifle" ? 3 : 2    // Thicker line for sniper
         });
-        const trailPositions = new Float32Array(BULLET_TRAIL_LENGTH * 3);
+        
+        // For sniper rifle, use a longer trail
+        const trailLength = weapon.name === "Sniper Rifle" ? BULLET_TRAIL_LENGTH * 1.5 : BULLET_TRAIL_LENGTH;
+        const trailPositions = new Float32Array(Math.round(trailLength) * 3);
         
         // Initialize all trail positions to bullet's starting position
         const validPos = new THREE.Vector3(
@@ -1122,7 +1129,7 @@ function shootBullet(input, weapon, player, scene) {
             isNaN(bullet.position.z) ? 0 : bullet.position.z
         );
         
-        for (let j = 0; j < BULLET_TRAIL_LENGTH; j++) {
+        for (let j = 0; j < trailPositions.length / 3; j++) {
             trailPositions[j * 3] = validPos.x;
             trailPositions[j * 3 + 1] = validPos.y;
             trailPositions[j * 3 + 2] = validPos.z;
@@ -1158,8 +1165,8 @@ function shootBullet(input, weapon, player, scene) {
         // Create a point light that follows the bullet for enhanced visibility
         const bulletLight = new THREE.PointLight(
             bulletColor, // Use same color as bullet
-            0.5, // Intensity
-            2 // Distance
+            weapon.name === "Sniper Rifle" ? 0.8 : 0.5, // Higher intensity for sniper
+            weapon.name === "Sniper Rifle" ? 3 : 2      // Larger radius for sniper
         );
         bulletLight.position.copy(bullet.position);
         scene.add(bulletLight);
@@ -1183,7 +1190,12 @@ function shootBullet(input, weapon, player, scene) {
             weaponType: weapon.name, // Add weapon type for knockback calculation
             distance: 0,
             maxDistance: 50,
-            createdAt: currentTime
+            createdAt: currentTime,
+            // Add piercing properties if weapon can pierce
+            canPierce: weapon.canPierce || false,
+            maxPierceCount: weapon.maxPierceCount || 1,
+            pierceCount: 0,               // Current number of zombies pierced
+            piercedZombies: new Set()     // Set to track which zombies have been hit
         });
     } 
 }
@@ -1213,7 +1225,8 @@ export function updateBullets(scene, zombies = []) {
             for (let j = 0; j < zombies.length; j++) {
                 const zombie = zombies[j];
 
-                if (zombie.userData.health <= 0) {
+                // Skip dead zombies or zombies already hit by this piercing bullet
+                if (zombie.userData.health <= 0 || (bullet.piercedZombies && bullet.piercedZombies.has(zombie.id))) {
                     continue;
                 }
                 
@@ -1238,6 +1251,12 @@ export function updateBullets(scene, zombies = []) {
                     
                     // Create blood impact effect
                     createBulletImpact(impactPos, scene, 'zombie');
+                    
+                    // For piercing sniper bullets, add a special effect
+                    if (bullet.canPierce && bullet.weaponType === "Sniper Rifle") {
+                        // Create a more dramatic piercing effect
+                        createPiercingEffect(bullet, zombie, scene);
+                    }
                     
                     // Calculate knockback force based on bullet damage and type
                     const knockbackAmount = bullet.damage * (bullet.weaponType === 'Shotgun' ? 0.1 : 0.5);
@@ -1278,7 +1297,27 @@ export function updateBullets(scene, zombies = []) {
                         console.log(`Zombie hit! Damage: ${bullet.damage}, Knockback: ${knockbackAmount.toFixed(2)}`);
                     }
                     
-                    break; // A bullet can only hit one zombie
+                    // For piercing bullets, track the zombie and increment pierce count
+                    if (bullet.canPierce) {
+                        // Ensure zombie has an ID for tracking
+                        if (!zombie.id) {
+                            zombie.id = Date.now() + '_' + Math.random();
+                        }
+                        
+                        // Add to list of pierced zombies
+                        bullet.piercedZombies.add(zombie.id);
+                        bullet.pierceCount++;
+                        
+                        // If we've hit max pierce count, set hitZombie to true to remove bullet
+                        if (bullet.pierceCount >= bullet.maxPierceCount) {
+                            // We've reached our pierce limit, stop the bullet
+                            break;
+                        }
+                        // Otherwise continue to the next zombie (don't break)
+                    } else {
+                        // Non-piercing bullets stop at the first hit
+                        break;
+                    }
                 }
             }
         }
@@ -1303,10 +1342,13 @@ export function updateBullets(scene, zombies = []) {
         const travelDistance = bullet.velocity.length();
         bullet.distance += travelDistance;
         
-        // Remove bullet if it's gone too far, too old, or hit a zombie
+        // For piercing bullets, only remove if max pierce count reached or max distance exceeded
+        const shouldRemovePiercingBullet = bullet.canPierce && bullet.pierceCount >= bullet.maxPierceCount;
+        
+        // Remove bullet if it's gone too far, too old, or hit a zombie (and can't pierce or reached max pierce)
         if (bullet.distance > bullet.maxDistance || 
             currentTime - bullet.createdAt > BULLET_LIFE_TIME ||
-            hitZombie) {
+            (hitZombie && (!bullet.canPierce || shouldRemovePiercingBullet))) {
             scene.remove(bullet.mesh);
             scene.remove(bullet.trail);
             if (bullet.light) {
@@ -1375,6 +1417,19 @@ export function getBulletModel() {
 
 // Add a remote player bullet to be updated
 export function addRemoteBullet(bullet) {
+    if (!bullet || !bullet.mesh) {
+        console.warn("Tried to add invalid remote bullet");
+        return;
+    }
+    
+    // Add network-related piercing properties if it's a sniper rifle
+    if (bullet.weaponType === "Sniper Rifle") {
+        bullet.canPierce = true;
+        bullet.maxPierceCount = 3;
+        bullet.pierceCount = 0;
+        bullet.piercedZombies = new Set();
+    }
+    
     remotePlayerBullets.push(bullet);
 }
 
@@ -1413,4 +1468,107 @@ export function stopSmgSound() {
     smgShotSound.currentTime = 0;
     isSmgFiring = false;
     console.log("Stopped SMG sound");
+}
+
+// Function to create a special effect when a sniper bullet pierces through a zombie
+function createPiercingEffect(bullet, zombie, scene) {
+    // Calculate exit point
+    const exitPoint = zombie.position.clone();
+    
+    // Add slight offset based on bullet direction to create exit wound
+    exitPoint.add(bullet.direction.clone().multiplyScalar(2.0));
+    
+    // Create a bright flash effect at exit point
+    const flashGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+    const flashMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000, // Bright red
+        transparent: true,
+        opacity: 0.8
+    });
+    const flashMesh = new THREE.Mesh(flashGeometry, flashMaterial);
+    flashMesh.position.copy(exitPoint);
+    scene.add(flashMesh);
+    
+    // Create exit particles (blood spray)
+    const particleCount = 10;
+    const particleGeometry = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleSizes = new Float32Array(particleCount);
+    
+    // Setup exit particle positions
+    for (let i = 0; i < particleCount; i++) {
+        // Start at exit point
+        particlePositions[i * 3] = exitPoint.x;
+        particlePositions[i * 3 + 1] = exitPoint.y;
+        particlePositions[i * 3 + 2] = exitPoint.z;
+        
+        // Random sizes for particles
+        particleSizes[i] = Math.random() * 0.1 + 0.05;
+    }
+    
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+    
+    // Create material for particles
+    const particleMaterial = new THREE.PointsMaterial({
+        color: 0xff0000, // Red for blood
+        size: 0.1,
+        transparent: true,
+        opacity: 0.8,
+        sizeAttenuation: true
+    });
+    
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.userData = {
+        velocities: Array(particleCount).fill().map(() => {
+            // Direction is mostly along bullet path with some spread
+            return new THREE.Vector3(
+                bullet.direction.x + (Math.random() - 0.5) * 0.5,
+                bullet.direction.y + (Math.random() - 0.5) * 0.5 + 0.1, // Slightly upward
+                bullet.direction.z + (Math.random() - 0.5) * 0.5
+            ).normalize().multiplyScalar(Math.random() * 0.2 + 0.05);
+        }),
+        createdAt: Date.now()
+    };
+    scene.add(particles);
+    
+    // Add a temporary light at exit point
+    const exitLight = new THREE.PointLight(0xff0000, 2, 4);
+    exitLight.position.copy(exitPoint);
+    scene.add(exitLight);
+    
+    // Animate the effect
+    const animateEffect = () => {
+        // Update particle positions
+        const positions = particles.geometry.attributes.position.array;
+        const velocities = particles.userData.velocities;
+        
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] += velocities[i].x;
+            positions[i * 3 + 1] += velocities[i].y;
+            positions[i * 3 + 2] += velocities[i].z;
+            
+            // Add gravity effect
+            velocities[i].y -= 0.001;
+        }
+        
+        // Update particle positions and opacity
+        particles.geometry.attributes.position.needsUpdate = true;
+        
+        // Fade out the flash and particles over time
+        const age = (Date.now() - particles.userData.createdAt) / 500; // 500ms lifetime
+        if (age < 1) {
+            particles.material.opacity = flashMesh.material.opacity = 1 - age;
+            exitLight.intensity = 2 * (1 - age);
+            requestAnimationFrame(animateEffect);
+        } else {
+            // Remove everything when animation completes
+            scene.remove(flashMesh);
+            scene.remove(particles);
+            scene.remove(exitLight);
+        }
+    };
+    
+    // Start animation
+    requestAnimationFrame(animateEffect);
 }
