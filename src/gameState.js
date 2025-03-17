@@ -136,51 +136,54 @@ export function initializeGameState() {
 export function gameOver() {
     if (gameState.isGameOver) return; // Prevent multiple calls
     
-    // Mark game as over
     gameState.isGameOver = true;
+    gameState.gameEndTime = Date.now();
     
-    // Stop any active zombie spawns
-    if (gameState.spawnInterval) {
-        clearInterval(gameState.spawnInterval);
-        gameState.spawnInterval = null;
+    // Send death event to other players (if in multiplayer)
+    if (window.playerId) {
+        sendPlayerDeathEvent();
     }
     
-    // Stop any wave timers
-    if (gameState.waveTimeout) {
-        clearTimeout(gameState.waveTimeout);
-        gameState.waveTimeout = null;
+    // Calculate survival time in seconds
+    const survivalTimeInSeconds = Math.floor((gameState.gameEndTime - gameState.gameStartTime) / 1000);
+    const minutes = Math.floor(survivalTimeInSeconds / 60);
+    const seconds = survivalTimeInSeconds % 60;
+    const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Update UI elements with final stats
+    document.getElementById('final-score').textContent = gameState.score;
+    document.getElementById('final-kills').textContent = gameState.zombiesKilled.total;
+    document.getElementById('survival-time').textContent = formattedTime;
+    
+    // Add wave information if not already present
+    if (!document.getElementById('final-wave')) {
+        const statsContainer = document.querySelector('.stats-container');
+        if (statsContainer) {
+            const waveItem = document.createElement('div');
+            waveItem.className = 'stat-item';
+            
+            const waveLabel = document.createElement('div');
+            waveLabel.className = 'stat-label';
+            waveLabel.textContent = 'HIGHEST WAVE';
+            
+            const waveValue = document.createElement('div');
+            waveValue.id = 'final-wave';
+            waveValue.className = 'stat-value';
+            waveValue.textContent = gameState.currentWave;
+            
+            waveItem.appendChild(waveLabel);
+            waveItem.appendChild(waveValue);
+            statsContainer.appendChild(waveItem);
+        }
+    } else {
+        document.getElementById('final-wave').textContent = gameState.currentWave;
     }
     
-    // Get player stats for display
-    const killCount = gameState.zombiesKilled;
-    const waveCount = gameState.currentWave;
-    const survivalTime = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
-    const minutes = Math.floor(survivalTime / 60);
-    const seconds = survivalTime % 60;
-    
-    // Update game over screen with stats
+    // Show game over screen
     const gameOverScreen = document.getElementById('game-over-screen');
-    const statsElement = document.getElementById('game-over-stats');
-    
-    if (statsElement) {
-        statsElement.innerHTML = `
-            <div class="stat">
-                <span class="stat-value">${killCount}</span>
-                <span class="stat-label">Zombies Killed</span>
-            </div>
-            <div class="stat">
-                <span class="stat-value">${waveCount}</span>
-                <span class="stat-label">Waves Survived</span>
-            </div>
-            <div class="stat">
-                <span class="stat-value">${minutes}m ${seconds}s</span>
-                <span class="stat-label">Survival Time</span>
-            </div>
-        `;
-    }
-    
-    // Show game over UI
     gameOverScreen.style.display = 'flex';
+    
+    console.log('Game Over!');
 }
 
 // Wave system functions

@@ -1198,35 +1198,9 @@ export function generateSpawnPointsAroundPlayer(player, minDistance, maxDistance
 }
 
 // Remove dead zombies (optionally with delay after death animation)
-export function cleanupDeadZombies(scene, delay = 5000) {
+export function cleanupDeadZombies(scene, delay = 10000) {
     const currentTime = Date.now();
-    const MAX_ZOMBIES = 100; // Maximum zombies to keep in the scene
-    const MAX_DEAD_ZOMBIES = 30; // Maximum number of dead zombies to keep at any time
     
-    // Count dead zombies
-    const deadZombies = zombies.filter(z => z.userData.isDead);
-    const deadCount = deadZombies.length;
-    
-    // If we have too many total zombies or too many dead zombies, force cleanup
-    const forceCleanup = zombies.length > MAX_ZOMBIES || deadCount > MAX_DEAD_ZOMBIES;
-    
-    // Sort dead zombies by death time if we need to force cleanup
-    let zombiesToForceCleanup = [];
-    if (forceCleanup && deadCount > 0) {
-        // Sort dead zombies by death time (oldest first)
-        zombiesToForceCleanup = deadZombies
-            .filter(z => z.userData.deathTime)
-            .sort((a, b) => a.userData.deathTime - b.userData.deathTime);
-            
-        // Limit to half of the excess dead zombies to avoid removing too many at once
-        const excessDeadCount = Math.max(1, Math.min(
-            Math.ceil(deadCount - MAX_DEAD_ZOMBIES), 
-            Math.ceil(deadCount / 2)
-        ));
-        zombiesToForceCleanup = zombiesToForceCleanup.slice(0, excessDeadCount);
-    }
-    
-    // Remove zombies from scene and array
     for (let i = zombies.length - 1; i >= 0; i--) {
         const zombie = zombies[i];
         
@@ -1236,9 +1210,7 @@ export function cleanupDeadZombies(scene, delay = 5000) {
                 zombie.userData.deathTime = currentTime;
             }
             
-            // Remove if it's been dead for longer than the delay or if it's in the force cleanup list
-            if (currentTime - zombie.userData.deathTime > delay || 
-                zombiesToForceCleanup.includes(zombie)) {
+            if (currentTime - zombie.userData.deathTime > delay) {
                 // Remove from scene and array
                 scene.remove(zombie);
                 zombies.splice(i, 1);

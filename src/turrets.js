@@ -239,9 +239,9 @@ function fireTurretBullet(turret, scene, targetPosition) {
     createMuzzleFlash(turret, scene);
     
     // Play shooting sound
-    //if (SoundManager) {
-    //    SoundManager.playTurretShot(); // Lower volume for turret
-    //}
+    if (SoundManager) {
+        SoundManager.playTurretShot(); 
+    }
     
     // Store bullet data
     turret.bullets.push({
@@ -431,26 +431,22 @@ export function cleanupTurrets(scene) {
 }
 
 /**
- * Create turrets around the spawn points
+ * Create two turrets near the player spawn position
  * @param {THREE.Scene} scene - The game scene
- * @returns {Array} - Array of turret objects
+ * @param {THREE.Vector3} playerPosition - The player spawn position
+ * @returns {Array} Array of created turrets
  */
-export function createSpawnTurrets(scene) {
-    const turrets = [];
-    const spawnPoint = getSpawnPoint();
+export function createSpawnTurrets(scene, playerPosition) {
+    // Create two turrets flanking the player spawn
+    const turret1 = createTurret(
+        scene,
+        new THREE.Vector3(playerPosition.x - 5, 0, playerPosition.z - 5)
+    );
     
-    // Place 4 turrets in a square around the spawn point
-    const positions = [
-        { x: spawnPoint.x + 15, z: spawnPoint.z + 15 },
-        { x: spawnPoint.x + 15, z: spawnPoint.z - 15 },
-        { x: spawnPoint.x - 15, z: spawnPoint.z + 15 },
-        { x: spawnPoint.x - 15, z: spawnPoint.z - 15 }
-    ];
+    const turret2 = createTurret(
+        scene,
+        new THREE.Vector3(playerPosition.x + 5, 0, playerPosition.z - 5)
+    );
     
-    positions.forEach(pos => {
-        const turret = createTurret(new THREE.Vector3(pos.x, 0, pos.z), scene);
-        turrets.push(turret);
-    });
-    
-    return turrets;
+    return [turret1, turret2];
 } 
