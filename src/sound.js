@@ -56,6 +56,12 @@ const SOUNDS = {
     category: SOUND_CATEGORIES.WEAPONS,
     loop: true
   },
+  TURRET_SHOT: {
+    url: '/sounds/smg.mp3',
+    volume: 0.1,
+    category: SOUND_CATEGORIES.WEAPONS,
+    loop: true
+  },
   RELOAD: {
     url: '/sounds/reload.mp3',
     volume: 1.0,
@@ -394,6 +400,7 @@ const SoundManager = {
   playPistolShot: () => playSound('PISTOL_SHOT', { resetTime: true }),
   playShotgunShot: () => playSound('SHOTGUN_SHOT', { resetTime: true }),
   playSmgShot: () => playSound('SMG_SHOT', { resetTime: true }),
+  playTurretShot: () => playSound('TURRET_SHOT', { resetTime: true }),
   playReload: () => playSound('RELOAD', { resetTime: true }),
   playEmptyClip: () => playSound('EMPTY_CLIP', { resetTime: true }),
   
