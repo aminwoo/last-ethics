@@ -523,8 +523,32 @@ function animate(time) {
     updateTurrets(deltaTime, scene, ZombieSystem.getZombies());
     
     // Periodically cleanup dead zombies
-    if (gameState.frameCount % 120 === 0) {
+    if (gameState.frameCount % 60 === 0) {
         ZombieSystem.cleanupDeadZombies(scene);
+        
+        // Update debug counter for zombie count if debug mode is enabled
+        if (window.DEBUG_MODE) {
+            const zombieCount = ZombieSystem.getZombies().length;
+            const deadCount = ZombieSystem.getZombies().filter(z => z.userData.isDead).length;
+            const debugElement = document.getElementById('debug-info');
+            if (debugElement) {
+                debugElement.innerHTML = `Zombies: ${zombieCount} (${deadCount} dead)`;
+            } else {
+                const debugInfo = document.createElement('div');
+                debugInfo.id = 'debug-info';
+                debugInfo.style.position = 'absolute';
+                debugInfo.style.bottom = '10px';
+                debugInfo.style.left = '10px';
+                debugInfo.style.color = 'white';
+                debugInfo.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                debugInfo.style.padding = '5px';
+                debugInfo.style.fontFamily = 'monospace';
+                debugInfo.style.fontSize = '12px';
+                debugInfo.style.zIndex = '1000';
+                debugInfo.innerHTML = `Zombies: ${zombieCount} (${deadCount} dead)`;
+                document.body.appendChild(debugInfo);
+            }
+        }
     }
     
     // Apply screen shake effect if enabled
@@ -662,4 +686,212 @@ function cleanupResources() {
     
     // Clean up networking resources
     cleanupNetworking();
+}
+
+/**
+ * Initialize audio
+ * @returns {Promise} A promise that resolves when audio is initialized
+ */
+async function initializeAudio() {
+    // Initialize our sound manager
+    if (typeof SoundManager !== 'undefined' && SoundManager.initSoundSystem) {
+        try {
+            await SoundManager.initSoundSystem();
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+    return false;
+}
+
+/**
+ * Spawn turrets around the player spawn point
+ * @param {THREE.Scene} scene - The game scene
+ * @returns {Array} Array of turret objects
+ */
+function spawnTurrets(scene) {
+    const turrets = [];
+    
+    // Create turrets near player spawn
+    const spawnPoint = getSpawnPoint();
+    
+    // Create multiple turrets in a circle around spawn
+    const turretCount = 4;
+    const radius = 15;
+    
+    for (let i = 0; i < turretCount; i++) {
+        const angle = (i / turretCount) * Math.PI * 2;
+        const x = spawnPoint.x + Math.cos(angle) * radius;
+        const z = spawnPoint.z + Math.sin(angle) * radius;
+        
+        const turret = createTurret(new THREE.Vector3(x, 0, z), scene);
+        turrets.push(turret);
+    }
+    
+    return turrets;
+}
+
+/**
+ * Initialize networking
+ * @param {THREE.Scene} scene - The game scene
+ * @returns {Promise} A promise that resolves when networking is initialized
+ */
+async function initializeNetworking(scene) {
+    if (typeof initializeNetworking !== 'undefined') {
+        try {
+            // Initialize networking with a callback for player count updates
+            await window.initializeNetworking(updatePlayerCount, scene);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+    return false;
+}
+
+/**
+ * Handle player stopping weapon fire
+ * Used when user releases mouse button
+ */
+function handleStopFire() {
+    // Update UI
+    isMouseDown = false;
+    
+    // Stop weapon firing
+    if (typeof stopWeaponFire === 'function') {
+        stopWeaponFire();
+    }
+    
+    // Send network update that we stopped firing
+    if (typeof sendPlayerUpdate === 'function' && window.playerObject) {
+        sendPlayerUpdate(window.playerObject, false);
+    }
+}
+
+/**
+ * Spawn a wave of zombies
+ * @param {number} zombieCount - Number of zombies to spawn
+ */
+function spawnZombieWave(zombieCount) {
+    if (!scene || !window.playerObject) return;
+    
+    const player = window.playerObject;
+    const spawnDistance = 30; // How far from player to spawn
+    
+    // Create zombies in a circle around the player
+    for (let i = 0; i < zombieCount; i++) {
+        // Random angle around player
+        const angle = Math.random() * Math.PI * 2;
+        
+        // Add some variation to the distance
+        const distance = spawnDistance + (Math.random() * 10 - 5);
+        
+        // Calculate position
+        const x = player.position.x + Math.cos(angle) * distance;
+        const z = player.position.z + Math.sin(angle) * distance;
+        
+        // Randomize zombie type based on wave
+        let zombieType = 'regular';
+        
+        const wave = gameState.currentWave;
+        
+        // Determine zombie type based on wave number
+        if (wave >= 5) {
+            // Higher waves have more special zombies
+            const roll = Math.random();
+            
+            if (wave >= 10 && roll < 0.15) {
+                // 15% chance for brutes in wave 10+
+                zombieType = 'brute';
+            } else if (roll < 0.3) {
+                // 30% chance for runners (or 15% if brutes are possible)
+                zombieType = 'runner';
+            }
+        }
+        
+        // Create the zombie and add to scene
+        const zombie = createZombie(new THREE.Vector3(x, 0, z), zombieType);
+        scene.add(zombie);
+        
+        // Add to active zombies list
+        activeZombies.push(zombie);
+    }
+}
+
+/**
+ * Game loop function
+ * @param {number} timestamp - Current animation frame timestamp
+ */
+function gameLoop(timestamp) {
+    // Schedule next frame
+    requestAnimationFrame(gameLoop);
+    
+    // Calculate delta time
+    const deltaTime = Math.min((timestamp - lastFrameTime) / 1000, 0.1);
+    lastFrameTime = timestamp;
+    
+    // Update fps counter
+    frames++;
+    frameTime += deltaTime;
+    if (frameTime >= 1) {
+        currentFps = Math.round(frames / frameTime);
+        frames = 0;
+        frameTime = 0;
+        
+        // Update FPS display
+        const fpsElement = document.getElementById('fps-counter');
+        if (fpsElement) {
+            fpsElement.textContent = `FPS: ${currentFps}`;
+        }
+    }
+    
+    // Only update game if it's active
+    if (!gameState.isGameOver && !gameState.isPaused) {
+        // Update controls
+        if (controls) {
+            controls.update(deltaTime);
+        }
+        
+        // Update player movement
+        if (movePlayer && window.playerObject) {
+            movePlayer(deltaTime);
+        }
+        
+        // Update weapons
+        if (typeof updateWeapons === 'function') {
+            updateWeapons(deltaTime);
+        }
+        
+        // Update bullets
+        if (typeof updateBullets === 'function') {
+            updateBullets(deltaTime);
+        }
+        
+        // Update zombies
+        updateZombies(deltaTime);
+        
+        // Update networking (player positions, etc.)
+        if (typeof updateNetworking === 'function') {
+            updateNetworking();
+        }
+        
+        // Update particles
+        if (typeof ParticleManager !== 'undefined' && ParticleManager.update) {
+            ParticleManager.update(deltaTime);
+        }
+        
+        // Update wave system
+        if (typeof gameState !== 'undefined' && gameState.checkWaveProgress) {
+            gameState.checkWaveProgress();
+        }
+        
+        // Render the scene
+        renderer.render(scene, camera);
+        
+        // Render CSS2D elements
+        if (labelRenderer) {
+            labelRenderer.render(scene, camera);
+        }
+    }
 }

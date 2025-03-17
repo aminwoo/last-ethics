@@ -125,4 +125,126 @@ export function testZombieHorde(scene, position, playerRef) {
     console.log("- 1 Brute zombie");
     
     return horde;
+}
+
+/**
+ * Create test zombies of all types
+ * @param {THREE.Scene} scene - The scene to add zombies to
+ * @returns {Object} - Object containing references to all created zombies
+ */
+export function createTestZombies(scene) {
+    const zombies = {};
+    
+    // Create regular zombie
+    zombies.regular = ZombieSystem.createZombie(
+        scene, 
+        new THREE.Vector3(-5, 0, -5), 
+        'REGULAR', 
+        null
+    );
+    scene.add(zombies.regular);
+    
+    // Create runner zombie
+    zombies.runner = ZombieSystem.createZombie(
+        scene, 
+        new THREE.Vector3(0, 0, -5), 
+        'RUNNER', 
+        null
+    );
+    scene.add(zombies.runner);
+    
+    // Create brute zombie
+    zombies.brute = ZombieSystem.createZombie(
+        scene, 
+        new THREE.Vector3(5, 0, -5), 
+        'BRUTE', 
+        null
+    );
+    scene.add(zombies.brute);
+    
+    return zombies;
+}
+
+/**
+ * Test damage on a zombie
+ * @param {Object} zombie - The zombie object to test damage on
+ * @param {Number} damage - Amount of damage to apply
+ */
+export function testZombieDamage(zombie, damage = 25) {
+    if (!zombie) {
+        return;
+    }
+    
+    const originalHealth = zombie.userData.health;
+    
+    // Apply damage to zombie
+    if (zombie.userData && typeof zombie.userData.takeDamage === 'function') {
+        zombie.userData.takeDamage(damage);
+        
+        // Check if zombie died from damage
+        if (zombie.userData.health <= 0 && originalHealth > 0) {
+            // Zombie died
+        }
+    }
+}
+
+/**
+ * Create a test horde of different zombie types
+ * @param {THREE.Scene} scene - The scene to add zombies to
+ * @param {THREE.Vector3} position - The center position for the horde
+ * @returns {Array} - Array of created zombies
+ */
+export function createTestHorde(scene, position = new THREE.Vector3(0, 0, -15)) {
+    const zombies = [];
+    
+    // Create regular zombies
+    for (let i = 0; i < 3; i++) {
+        const offset = new THREE.Vector3(
+            (Math.random() - 0.5) * 5,
+            0,
+            (Math.random() - 0.5) * 5
+        );
+        const zombie = ZombieSystem.createZombie(
+            scene, 
+            position.clone().add(offset), 
+            'REGULAR', 
+            null
+        );
+        scene.add(zombie);
+        zombies.push(zombie);
+    }
+    
+    // Create runner zombies
+    for (let i = 0; i < 2; i++) {
+        const offset = new THREE.Vector3(
+            (Math.random() - 0.5) * 5,
+            0,
+            (Math.random() - 0.5) * 5
+        );
+        const zombie = ZombieSystem.createZombie(
+            scene, 
+            position.clone().add(offset), 
+            'RUNNER', 
+            null
+        );
+        scene.add(zombie);
+        zombies.push(zombie);
+    }
+    
+    // Create brute zombie
+    const bruteOffset = new THREE.Vector3(
+        (Math.random() - 0.5) * 5,
+        0,
+        (Math.random() - 0.5) * 5
+    );
+    const brute = ZombieSystem.createZombie(
+        scene, 
+        position.clone().add(bruteOffset), 
+        'BRUTE', 
+        null
+    );
+    scene.add(brute);
+    zombies.push(brute);
+    
+    return zombies;
 } 

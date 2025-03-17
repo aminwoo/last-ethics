@@ -431,27 +431,26 @@ export function cleanupTurrets(scene) {
 }
 
 /**
- * Create two turrets near the player spawn position
+ * Create turrets around the spawn points
  * @param {THREE.Scene} scene - The game scene
- * @param {THREE.Vector3} playerPosition - The player spawn position
- * @returns {Array} Array of created turrets
+ * @returns {Array} - Array of turret objects
  */
-export function createSpawnTurrets(scene, playerPosition) {
-    // Create two turrets flanking the player spawn
-    const turret1 = createTurret(
-        scene,
-        new THREE.Vector3(playerPosition.x - 5, 0, playerPosition.z - 5)
-    );
+export function createSpawnTurrets(scene) {
+    const turrets = [];
+    const spawnPoint = getSpawnPoint();
     
-    const turret2 = createTurret(
-        scene,
-        new THREE.Vector3(playerPosition.x + 5, 0, playerPosition.z - 5)
-    );
+    // Place 4 turrets in a square around the spawn point
+    const positions = [
+        { x: spawnPoint.x + 15, z: spawnPoint.z + 15 },
+        { x: spawnPoint.x + 15, z: spawnPoint.z - 15 },
+        { x: spawnPoint.x - 15, z: spawnPoint.z + 15 },
+        { x: spawnPoint.x - 15, z: spawnPoint.z - 15 }
+    ];
     
-    console.log('Created spawn turrets at:', 
-        turret1.object.position, 
-        turret2.object.position
-    );
+    positions.forEach(pos => {
+        const turret = createTurret(new THREE.Vector3(pos.x, 0, pos.z), scene);
+        turrets.push(turret);
+    });
     
-    return [turret1, turret2];
+    return turrets;
 } 

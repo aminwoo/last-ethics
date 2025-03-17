@@ -30,7 +30,6 @@ function getAudioContext() {
   if (!audioContext) {
     // Create new AudioContext when it's first needed
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    console.log('AudioContext created with state:', audioContext.state);
   }
   return audioContext;
 }
@@ -109,78 +108,80 @@ const SOUNDS = {
 const loadedSounds = {};
 const activeLoops = {};
 let isInitialized = false;
+let isInitializing = false;
 let initializationPromise = null;
 
 /**
  * Initialize the sound system
+ * @returns {Promise} A promise that resolves when the sound system is initialized
  */
 async function initSoundSystem() {
-  // If already initializing, return the existing promise
-  if (initializationPromise) {
+  if (isInitializing) {
     return initializationPromise;
   }
   
-  // Create a new initialization promise
-  initializationPromise = (async () => {
+  isInitializing = true;
+  initializationPromise = new Promise(async (resolve, reject) => {
     try {
-      // Resume audio context if it's suspended (needed for Chrome's autoplay policy)
-      if (getAudioContext().state === 'suspended') {
-        await getAudioContext().resume();
+      // Create audio context if needed
+      if (!audioContext) {
+        getAudioContext();
       }
       
-      // Load all sounds
-      const loadPromises = Object.entries(SOUNDS).map(([key, sound]) => {
-        return loadSound(key, sound);
-      });
+      // Resume audio context if needed
+      if (audioContext.state !== 'running') {
+        await audioContext.resume();
+      }
       
-      await Promise.all(loadPromises);
-      console.log('Sound system initialized');
+      // Now load all the sounds
+      await Promise.all(Object.keys(SOUNDS).map(soundId => loadSound(soundId)));
+      
       isInitialized = true;
+      isInitializing = false;
+      resolve();
     } catch (error) {
-      console.error('Failed to initialize sound system:', error);
-      throw error;
+      isInitializing = false;
+      reject(error);
     }
-  })();
+  });
   
   return initializationPromise;
 }
 
 /**
- * Load a sound into memory
+ * Load a sound
+ * @param {string} soundId - The ID of the sound to load
+ * @returns {Promise} A promise that resolves when the sound is loaded
  */
-async function loadSound(soundId, soundDef) {
+async function loadSound(soundId) {
+  // If sound is already loaded, return
+  if (loadedSounds[soundId]) {
+    return;
+  }
+  
+  // Get sound definition
+  const soundDef = SOUNDS[soundId];
+  if (!soundDef) {
+    throw new Error(`Sound definition not found for ${soundId}`);
+  }
+  
   try {
+    let sound;
+    
+    // Load sound based on strategy
     if (soundDef.useWebAudio) {
-      // Load using Web Audio API
-      const response = await fetch(soundDef.url);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await getAudioContext().decodeAudioData(arrayBuffer);
-      
-      loadedSounds[soundId] = {
-        buffer: audioBuffer,
-        ...soundDef
-      };
+      sound = await loadWebAudioSound(soundDef.url);
     } else {
-      // Load using HTML5 Audio
-      const audio = new Audio(soundDef.url);
-      audio.volume = soundDef.volume * masterVolume[soundDef.category] * masterVolume.master;
-      audio.loop = soundDef.loop;
-      
-      // Wait for the audio to be loaded
-      await new Promise((resolve) => {
-        audio.addEventListener('canplaythrough', resolve, { once: true });
-        audio.load();
-      });
-      
-      loadedSounds[soundId] = {
-        audio,
-        ...soundDef
-      };
+      sound = await loadHtmlAudioSound(soundDef.url);
     }
     
-    console.log(`Loaded sound: ${soundId}`);
+    // Store loaded sound with its properties
+    loadedSounds[soundId] = {
+      ...sound,
+      ...soundDef
+    };
   } catch (error) {
-    console.error(`Failed to load sound ${soundId}:`, error);
+    throw error;
   }
 }
 
@@ -193,13 +194,11 @@ async function loadSound(soundId, soundDef) {
 async function playSound(soundId, options = {}) {
   // Ensure the sound system is initialized
   if (!isInitialized) {
-    console.log(`Waiting for sound system to initialize before playing ${soundId}...`);
     await initSoundSystem();
   }
   
   const sound = loadedSounds[soundId];
   if (!sound) {
-    console.warn(`Sound ${soundId} not loaded`);
     return null;
   }
   
@@ -240,7 +239,7 @@ function playHtmlAudioSound(sound, volume, options = {}) {
   // Handle play promise (required for Chrome)
   if (playPromise !== undefined) {
     playPromise.catch(error => {
-      console.warn(`Error playing sound: ${error}`);
+      // Handle error
     });
   }
   
