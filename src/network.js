@@ -50,13 +50,11 @@ function initRemotePlayerAudio() {
                     }, 100);
                 })
                 .catch(error => {
-                    // Failed to initialize audio
-                    audioInitialized = false;
+                    // Error handling
                 });
         }
     } catch (error) {
-        // Handle any errors
-        audioInitialized = false;
+        // Error handling
     }
 }
 
@@ -64,7 +62,6 @@ function initRemotePlayerAudio() {
 document.addEventListener('keydown', (event) => {
     if (event.key.toLowerCase() === 'm') {
         showDetailedDebug = !showDetailedDebug;
-        console.log(`Debug details ${showDetailedDebug ? 'enabled' : 'disabled'}`);
         if (debugElement) {
             debugElement.style.maxHeight = showDetailedDebug ? '500px' : '250px';
         }
@@ -253,159 +250,177 @@ function updateRemotePlayerFlashlight(flashlight, playerPosition, playerRotation
  * @returns {Promise} Resolves when connection is established
  */
 function initializeNetworking(playerUpdatedCallback, scene) {
-    // Store callback for when player list changes
     onPlayersUpdated = playerUpdatedCallback;
     
-    // Create WebSocket connection
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Initialize audio for remote players
+    initRemotePlayerAudio();
     
-    // Choose appropriate WebSocket URL based on environment
+    // Create debug display
+    createDebugDisplay();
+    
+    // Determine whether to use local or production WebSocket URL
+    // Check if we're on localhost or a real domain
+    const isLocalhost = 
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '';
+    
     let wsUrl;
     if (isLocalhost) {
-        // Use local server for development
-        wsUrl = `${wsProtocol}//${window.location.hostname}:3000`;
+        // Local development - use local WebSocket server
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = 'localhost';
+        const port = 3000; // Match the local server port
+        wsUrl = `${protocol}//${host}:${port}`;
     } else {
-        // Use production server
-        wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+        // Production environment - use deployed server
+        wsUrl = 'wss://last-ethics-server.onrender.com';
     }
     
-    // Attempt to connect to the WebSocket server
-    try {
-        socket = new WebSocket(wsUrl);
-    } catch (error) {
-        // If connection fails, resolve with error
-        return Promise.reject(error);
-    }
-    
-    // Return a promise that resolves when connection is established or fails
     return new Promise((resolve, reject) => {
-        // WebSocket event handlers
-        socket.onopen = () => {
-            // Connection successful
+        try {
+            socket = new WebSocket(wsUrl);
             
-            // Send initial position update to server
-            const player = window.playerObject;
-            if (player) {
-                sendPlayerUpdate(player);
-            }
+            socket.onopen = () => {
+                resolve();
+                
+                // Send an initial position update immediately after connection
+                // This will trigger the server to make this player visible to others
+                const playerObject = scene.getObjectByName('player');
+                if (playerObject) {
+                    sendPlayerUpdate(playerObject);
+                } else {
+                    // No player object found, but continue with initialization
+                }
+            };
             
-            // Initialize debug display if needed
-            if (showDetailedDebug) {
-                createDebugDisplay();
-            }
+            socket.onerror = (error) => {
+                reject(error);
+            };
             
-            // Resolve the promise to indicate successful connection
-            resolve();
-        };
-        
-        socket.onerror = (error) => {
-            // Reject the promise if connection fails
+            socket.onclose = (event) => {
+                // Try to reconnect after a delay if the connection was established before
+                if (playerId) {
+                    setTimeout(() => {
+                        initializeNetworking(playerUpdatedCallback, scene)
+                            .catch(() => {});
+                    }, 5000);
+                }
+            };
+            
+            socket.onmessage = (event) => {
+                handleServerMessage(event.data, scene);
+            };
+        } catch (error) {
             reject(error);
-        };
-        
-        socket.onclose = (event) => {
-            // Handle disconnection
-            
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-                initializeNetworking(playerUpdatedCallback, scene)
-                    .catch(err => {
-                        // Reconnection failed
-                    });
-            }, 5000);
-        };
-        
-        // Set timeout for connection attempt
-        setTimeout(() => {
-            if (socket.readyState !== WebSocket.OPEN) {
-                reject(new Error('Connection timeout'));
-            }
-        }, 10000);
-        
-        // Handle messages from server
-        socket.onmessage = (event) => {
-            try {
-                const messageData = event.data;
-                const message = JSON.parse(messageData);
-                
-                // Process the message
-                handleServerMessage(messageData, scene);
-                
-            } catch (error) {
-                // Error processing message
-            }
-        };
+        }
     });
 }
 
 /**
- * Process messages received from the server
- * @param {string} messageData - JSON message data
+ * Process a message from the server
+ * @param {string} messageData - The raw message data
  * @param {THREE.Scene} scene - The game scene
  */
 function handleServerMessage(messageData, scene) {
     try {
         const message = JSON.parse(messageData);
         
-        // Handle different message types
         switch (message.type) {
             case 'init':
-                // Server assigned us a player ID
-                playerId = message.playerId;
-                window.playerId = playerId; // Set global playerId for chat
+                // Store our player ID
+                playerId = message.id;
+                window.playerId = playerId; // Set global ID for chat
                 
-                // Add existing players if there are any
+                // Add name tag to local player now that we have an ID
+                const localPlayer = scene.getObjectByName('player');
+                if (localPlayer) {
+                    const nameTag = createPlayerNameTag(playerId, null, true);
+                    localPlayer.add(nameTag);
+                }
+                
+                // Create representations for existing players
                 if (message.players && message.players.length > 0) {
                     message.players.forEach(player => {
                         if (player.id !== playerId) {
                             addRemotePlayer(player, scene);
                         }
                     });
-                }
+                } 
                 
-                break;
-                
-            case 'playerUpdate':
-                // Update a remote player's position and rotation
-                if (message.id !== playerId) {
-                    updateRemotePlayer(message);
+                // Call the callback to update player UI
+                if (onPlayersUpdated) {
+                    onPlayersUpdated(remotePlayers.size);
                 }
                 break;
                 
-            case 'nameUpdate':
-                // Update a player's name tag
-                if (message.playerId !== playerId) {
-                    const remotePlayer = remotePlayers.get(message.playerId);
-                    if (remotePlayer) {
-                        updatePlayerNameTag(remotePlayer, message.name);
+            case 'playerNameChanged':
+                // Update the player's name tag
+                if (message.playerId && message.name) {
+                    // If it's our own name change confirmation, update local name tag
+                    if (message.playerId === playerId) {
+                        const localPlayer = scene.getObjectByName('player');
+                        if (localPlayer) {
+                            updatePlayerNameTag(localPlayer, message.name);
+                        }
+                    } else {
+                        // Update a remote player's name tag
+                        const remotePlayer = remotePlayers.get(message.playerId);
+                        if (remotePlayer) {
+                            updatePlayerNameTag(remotePlayer, message.name);
+                        }
                     }
                 }
                 break;
                 
             case 'playerJoined':
-                // A new player has joined
-                if (message.player.id !== playerId) {
+                // Skip if it's our own join message
+                if (message.player && message.player.id === playerId) {
+                    // This is just a confirmation of our own joining
+                    break;
+                }
+                
+                // Add the new player to our scene
+                if (message.player) {
                     addRemotePlayer(message.player, scene);
+                    
+                    // Call the callback to update player UI
+                    if (onPlayersUpdated) {
+                        onPlayersUpdated(remotePlayers.size);
+                    }
                 }
                 break;
                 
             case 'playerLeft':
-                // A player has left
-                if (message.id !== playerId) {
+                if (message.id && message.id !== playerId) {
                     removeRemotePlayer(message.id, scene);
+                    
+                    // Call the callback to update player UI
+                    if (onPlayersUpdated) {
+                        onPlayersUpdated(remotePlayers.size);
+                    }
                 }
                 break;
                 
             case 'playerDied':
-                // A player has died
                 handleRemotePlayerDeath(message.playerId, message.playerName, scene);
                 break;
                 
+            case 'playerUpdates':
+                // Handle bulk updates of all players
+                if (Array.isArray(message.players)) {
+                    message.players.forEach(playerData => {
+                        if (playerData.id !== playerId) {
+                            updateRemotePlayer(playerData);
+                        }
+                    });
+                }
+                break;
+                
             case 'chat':
-                // Chat message received
+                // Handle incoming chat message
                 addChatMessage(
-                    message.playerId, 
+                    message.playerId,
                     message.playerName,
                     message.message,
                     message.timestamp,
@@ -413,61 +428,56 @@ function handleServerMessage(messageData, scene) {
                 );
                 break;
                 
-            case 'playerCount':
-                // Update player count display if callback exists
-                if (onPlayersUpdated) {
-                    onPlayersUpdated(message.count);
-                }
+            default:
+                // Unhandled message type
                 break;
         }
+        
+        // Update player count in UI if callback exists
+        if (message.playerCount !== undefined && onPlayersUpdated) {
+            const count = message.playerCount;
+            onPlayersUpdated(count);
+        }
     } catch (error) {
-        // Error processing server message
+        // Error in processing message
     }
 }
 
 /**
- * Create a visual representation of a remote player
+ * Add a new remote player to the scene
  * @param {Object} playerData - Player data from server
  * @param {THREE.Scene} scene - The game scene
  */
 function addRemotePlayer(playerData, scene) {
-    // Check if player already exists
+    // Check if player already exists in our map
     if (remotePlayers.has(playerData.id)) {
+        // Player already exists, just update their position
+        updateRemotePlayerTransform(remotePlayers.get(playerData.id), playerData);
         return;
     }
     
-    // Create remote player model and add to scene
-    const remotePlayer = createPlayer(false, playerData.name || `Player ${playerData.id}`);
+    // Create new remote player
+    const remotePlayer = createPlayer({
+        isRemote: true,
+        position: playerData.position || { x: 0, y: 0, z: 0 },
+        rotation: playerData.rotation || { x: 0, y: 0, z: 0 },
+        name: playerData.name || `Player ${playerData.id}`
+    });
     
-    // Position the player
-    if (playerData.position) {
-        remotePlayer.position.set(
-            playerData.position.x,
-            playerData.position.y,
-            playerData.position.z
-        );
-    }
+    // Set the player ID in userData for reference
+    remotePlayer.userData.playerId = playerData.id;
     
-    // Set rotation
-    if (playerData.rotation) {
-        remotePlayer.rotation.set(
-            playerData.rotation.x,
-            playerData.rotation.y,
-            playerData.rotation.z
-        );
-    }
-    
-    // Add to scene and store in remotePlayers Map
-    scene.add(remotePlayer);
-    remotePlayers.set(playerData.id, remotePlayer);
+    // Add a name tag to the remote player
+    const nameTag = createPlayerNameTag(playerData.id, playerData.name);
+    remotePlayer.add(nameTag);
     
     // Create a flashlight for the remote player
-    createRemotePlayerFlashlight(remotePlayer, scene);
+    const flashlight = createRemotePlayerFlashlight(remotePlayer, scene);
+    remotePlayer.userData.flashlight = flashlight;
     
-    // Update player count using callback
-    if (onPlayersUpdated) {
-        onPlayersUpdated(remotePlayers.size);
-    }
+    // Add player to the map and scene
+    remotePlayers.set(playerData.id, remotePlayer);
+    scene.add(remotePlayer);
 }
 
 /**
@@ -651,33 +661,32 @@ function getRemotePlayers() {
 }
 
 /**
- * Clean up networking resources
+ * Clean up networking resources when shutting down
  */
 function cleanupNetworking() {
-    // Close the WebSocket
+    // Close socket if it exists
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.close();
     }
     
     // Reset variables
     socket = null;
-    isSocketOpen = false;
     
     // Stop all remote player SMG sounds
-    remoteSmgSounds.forEach((soundData, playerId) => {
+    remoteSmgSounds.forEach((soundData, id) => {
         if (soundData.active) {
-            stopRemoteSmgSound(playerId);
+            stopRemoteSmgSound(id);
         }
     });
-    remoteSmgSounds.clear();
     
-    // Clear all remote players (scene removal should be handled by the caller)
+    // Clear the remote players map
     remotePlayers.clear();
     
-    // Reset chat history
-    chatMessages.length = 0;
-    
-    console.log('Network resources cleaned up');
+    // Remove debug display if it exists
+    if (debugElement && debugElement.parentNode) {
+        debugElement.parentNode.removeChild(debugElement);
+        debugElement = null;
+    }
 }
 
 /**
@@ -690,7 +699,6 @@ function cleanupStaleSounds() {
     
     remoteSmgSounds.forEach((soundData, playerId) => {
         if (soundData.active && (now - soundData.lastUpdated > STALE_THRESHOLD)) {
-            console.log(`Auto-stopping stale SMG sound for player ${playerId} (${now - soundData.lastUpdated}ms old)`);
             stopRemoteSmgSound(playerId);
         }
     });
@@ -717,47 +725,39 @@ function updateNetworking() {
 }
 
 /**
- * Send a chat message to all connected players
- * @param {string} message - The message to send
+ * Send a chat message to all players
+ * @param {string} message - The chat message text
+ * @returns {boolean} - Success status
  */
 function sendChatMessage(message) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-        console.warn('Cannot send chat message: WebSocket not connected');
         return false;
     }
-    
-    if (!message || message.trim() === '') {
-        return false;
-    }
-    
-    // Limit message length
-    const trimmedMessage = message.trim().slice(0, 200);
     
     socket.send(JSON.stringify({
         type: 'chat',
-        message: trimmedMessage
+        message: message
     }));
     
     return true;
 }
 
 /**
- * Set the player's name
- * @param {string} name - The player's name
+ * Set the player's display name
+ * @param {string} name - The name to set
+ * @returns {boolean} - Success status
  */
 function setPlayerName(name) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-        console.warn('Cannot set player name: WebSocket not connected');
         return false;
     }
     
-    if (!name || name.trim() === '') {
-        return false;
-    }
+    // Trim and limit name length
+    const trimmedName = name.trim().substring(0, 20);
     
     socket.send(JSON.stringify({
         type: 'setName',
-        name: name.trim()
+        name: trimmedName
     }));
     
     return true;
@@ -1165,7 +1165,6 @@ function createRemotePlayerBullets(scene, playerObject, weaponType) {
  */
 function playRemotePlayerWeaponSound(weaponType, playerId) {
     if (!playerId) {
-        console.warn('Missing player ID for remote weapon sound');
         return;
     }
     
@@ -1189,37 +1188,6 @@ function playRemotePlayerWeaponSound(weaponType, playerId) {
 }
 
 /**
- * Stops the SMG sound for a specific remote player
- * @param {string} playerId - The ID of the remote player
- */
-function stopRemoteSmgSound(playerId) {
-    if (remoteSmgSounds.has(playerId)) {
-        const soundData = remoteSmgSounds.get(playerId);
-        
-        if (soundData.active) {
-            // Stop the specific audio instance if we have one
-            if (soundData.audio) {
-                try {
-                    soundData.audio.pause();
-                    soundData.audio.currentTime = 0;
-                } catch (error) {
-                    // Error stopping sound
-                }
-            }
-            
-            // Use SoundManager as a fallback
-            if (SoundManager && SoundManager.stopSmgSound) {
-                SoundManager.stopSmgSound();
-            }
-            
-            // Mark the sound as inactive
-            soundData.active = false;
-            remoteSmgSounds.set(playerId, soundData);
-        }
-    }
-}
-
-/**
  * Send a notification to all players that the local player has died
  */
 function sendPlayerDeathEvent() {
@@ -1236,22 +1204,21 @@ function sendPlayerDeathEvent() {
 
 /**
  * Handle a remote player death event
- * @param {number} deadPlayerId - ID of the player who died
- * @param {string} playerName - Name of the player who died
+ * @param {string} deadPlayerId - The ID of the player who died
+ * @param {string} playerName - The name of the player who died
  * @param {THREE.Scene} scene - The game scene
  */
 function handleRemotePlayerDeath(deadPlayerId, playerName, scene) {
-    // Get the player object
-    const deadPlayer = remotePlayers.get(deadPlayerId);
-    if (!deadPlayer) {
-        return;
+    // Get the player object if available
+    const playerObject = remotePlayers.get(deadPlayerId);
+    
+    if (playerObject) {
+        // Create death effect at player position
+        createPlayerDeathEffect(playerObject.position, scene);
+        
+        // Remove the player from the scene
+        removeRemotePlayer(deadPlayerId, scene);
     }
-    
-    // Create a death effect at the player's position
-    createPlayerDeathEffect(deadPlayer.position, scene);
-    
-    // Remove the player from the scene
-    removeRemotePlayer(deadPlayerId, scene);
 }
 
 /**
@@ -1355,6 +1322,5 @@ export {
     createRemotePlayerFlashlight,
     updateRemotePlayerFlashlight,
     sendPlayerDeathEvent,
-    stopRemoteSmgSound,
     initRemotePlayerAudio
 }; 

@@ -17,8 +17,8 @@ const SOUND_CATEGORIES = {
 
 // Master volume controls
 const masterVolume = {
-  master: 1.0,
-  [SOUND_CATEGORIES.WEAPONS]: 1.0,
+  master: 0.5,
+  [SOUND_CATEGORIES.WEAPONS]: 0.5,
   [SOUND_CATEGORIES.AMBIENT]: 0.8,
   [SOUND_CATEGORIES.UI]: 1.0,
   [SOUND_CATEGORIES.PLAYER]: 1.0,
@@ -38,25 +38,31 @@ function getAudioContext() {
 const SOUNDS = {
   // Weapon sounds
   PISTOL_SHOT: {
-    url: '/sounds/pistol.mp3',
-    volume: 0.7,
+    url: '/sounds/pistol_shot.mp3',
+    volume: 0.2,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
   SHOTGUN_SHOT: {
-    url: '/sounds/shotgun.mp3',
-    volume: 0.8,
+    url: '/sounds/shotgun_shot.mp3',
+    volume: 0.3,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
-  SMG_SHOT: {
-    url: '/sounds/smg.mp3',
-    volume: 1.0,
+  AR_SHOT: {
+    url: '/sounds/ak47_shot.mp3',
+    volume: 0.5,
+    category: SOUND_CATEGORIES.WEAPONS,
+    loop: false
+  },
+  RIFLE_SHOT: {
+    url: '/sounds/rifle_shot.wav',
+    volume: 0.5,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
   TURRET_SHOT: {
-    url: '/sounds/smg.mp3',
+    url: '/sounds/pistol_shot.mp3',
     volume: 0.1,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
@@ -75,7 +81,7 @@ const SOUNDS = {
     loop: false
   },
   PLAYER_DEATH: {
-    url: '/sounds/731506__soundbitersfx__npcplayer-death-groans-male(1)-[AudioTrimmer.com].wav',
+    url: '/sounds/death.wav',
     volume: 1.0,
     category: SOUND_CATEGORIES.PLAYER,
     loop: false
@@ -108,80 +114,78 @@ const SOUNDS = {
 const loadedSounds = {};
 const activeLoops = {};
 let isInitialized = false;
-let isInitializing = false;
 let initializationPromise = null;
 
 /**
  * Initialize the sound system
- * @returns {Promise} A promise that resolves when the sound system is initialized
  */
 async function initSoundSystem() {
-  if (isInitializing) {
+  // If already initializing, return the existing promise
+  if (initializationPromise) {
     return initializationPromise;
   }
   
-  isInitializing = true;
-  initializationPromise = new Promise(async (resolve, reject) => {
+  // Create a new initialization promise
+  initializationPromise = (async () => {
     try {
-      // Create audio context if needed
-      if (!audioContext) {
-        getAudioContext();
+      // Resume audio context if it's suspended (needed for Chrome's autoplay policy)
+      if (getAudioContext().state === 'suspended') {
+        await getAudioContext().resume();
       }
       
-      // Resume audio context if needed
-      if (audioContext.state !== 'running') {
-        await audioContext.resume();
-      }
+      // Load all sounds
+      const loadPromises = Object.entries(SOUNDS).map(([key, sound]) => {
+        return loadSound(key, sound);
+      });
       
-      // Now load all the sounds
-      await Promise.all(Object.keys(SOUNDS).map(soundId => loadSound(soundId)));
-      
+      await Promise.all(loadPromises);
+      console.log('Sound system initialized');
       isInitialized = true;
-      isInitializing = false;
-      resolve();
     } catch (error) {
-      isInitializing = false;
-      reject(error);
+      console.error('Failed to initialize sound system:', error);
+      throw error;
     }
-  });
+  })();
   
   return initializationPromise;
 }
 
 /**
- * Load a sound
- * @param {string} soundId - The ID of the sound to load
- * @returns {Promise} A promise that resolves when the sound is loaded
+ * Load a sound into memory
  */
-async function loadSound(soundId) {
-  // If sound is already loaded, return
-  if (loadedSounds[soundId]) {
-    return;
-  }
-  
-  // Get sound definition
-  const soundDef = SOUNDS[soundId];
-  if (!soundDef) {
-    throw new Error(`Sound definition not found for ${soundId}`);
-  }
-  
+async function loadSound(soundId, soundDef) {
   try {
-    let sound;
-    
-    // Load sound based on strategy
     if (soundDef.useWebAudio) {
-      sound = await loadWebAudioSound(soundDef.url);
+      // Load using Web Audio API
+      const response = await fetch(soundDef.url);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await getAudioContext().decodeAudioData(arrayBuffer);
+      
+      loadedSounds[soundId] = {
+        buffer: audioBuffer,
+        ...soundDef
+      };
     } else {
-      sound = await loadHtmlAudioSound(soundDef.url);
+      // Load using HTML5 Audio
+      const audio = new Audio(soundDef.url);
+      audio.volume = soundDef.volume * masterVolume[soundDef.category] * masterVolume.master;
+      audio.loop = soundDef.loop;
+      
+      // Wait for the audio to be loaded
+      await new Promise((resolve) => {
+        audio.addEventListener('canplaythrough', resolve, { once: true });
+        audio.load();
+      });
+      
+      loadedSounds[soundId] = {
+        audio,
+        ...soundDef
+      };
     }
     
-    // Store loaded sound with its properties
-    loadedSounds[soundId] = {
-      ...sound,
-      ...soundDef
-    };
+    console.log(`Loaded sound: ${soundId}`);
   } catch (error) {
-    throw error;
+    console.error(`Failed to load sound ${soundId}:`, error);
   }
 }
 
@@ -239,7 +243,7 @@ function playHtmlAudioSound(sound, volume, options = {}) {
   // Handle play promise (required for Chrome)
   if (playPromise !== undefined) {
     playPromise.catch(error => {
-      // Handle error
+      console.warn(`Error playing sound: ${error}`);
     });
   }
   
@@ -398,27 +402,8 @@ const SoundManager = {
   // Weapon sound shortcuts
   playPistolShot: () => playSound('PISTOL_SHOT', { resetTime: true }),
   playShotgunShot: () => playSound('SHOTGUN_SHOT', { resetTime: true }),
-  playSmgShot: () => playSound('SMG_SHOT', { resetTime: true }),
-  stopSmgSound: () => {
-    console.log('Directly stopping SMG sound from SoundManager');
-    // Stop any SMG sound that might be playing
-    // Traverse all active loops and stop any that are SMG_SHOT
-    Object.keys(activeLoops).forEach(loopId => {
-      if (activeLoops[loopId] && activeLoops[loopId].sound && 
-          activeLoops[loopId].sound.url === SOUNDS.SMG_SHOT.url) {
-        console.log('Found SMG sound to stop:', loopId);
-        try {
-          activeLoops[loopId].source.stop();
-        } catch (e) {
-          console.warn('Error stopping sound:', e);
-        }
-        delete activeLoops[loopId];
-      }
-    });
-    
-    // Try directly stopping the sound by ID as a fallback
-    stopLoop('SMG_SHOT');
-  },
+  playARShot: () => playSound('AR_SHOT', { resetTime: true }),
+  playRifleShot: () => playSound('RIFLE_SHOT', { resetTime: true }),
   playTurretShot: () => playSound('TURRET_SHOT', { resetTime: true }),
   playReload: () => playSound('RELOAD', { resetTime: true }),
   playEmptyClip: () => playSound('EMPTY_CLIP', { resetTime: true }),
