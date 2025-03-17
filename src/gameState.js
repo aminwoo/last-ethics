@@ -33,7 +33,6 @@ export const WAVE_SETTINGS = {
         { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0 },
         { REGULAR: 0.35, RUNNER: 0.50, BRUTE: 0.15 },
         { REGULAR: 0.25, RUNNER: 0.55, BRUTE: 0.20 },
-        // Wave 19+: Nightmare difficulty
         { REGULAR: 0, RUNNER: 0.80, BRUTE: 0.20 },
     ]
 };
@@ -243,7 +242,7 @@ function completeWave() {
 
 // Get zombie type composition for current wave
 export function getWaveComposition() {
-    return WAVE_SETTINGS.composition[gameState.currentWave + 1];
+    return WAVE_SETTINGS.composition[Math.min(gameState.currentWave, WAVE_SETTINGS.composition.length - 1)];
 }
 
 // Calculate difficulty scaling factors for current wave
