@@ -1,420 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last Ethics - Multiplayer Shooter</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            font-family: Arial, sans-serif;
-        }
-        #gameContainer {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-        }
-        #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-size: 18px;
-            user-select: none;
-            z-index: 100;
-        }
-        #ammo {
-            margin-bottom: 5px;
-        }
-        #health {
-            margin-bottom: 5px;
-        }
-        #instructions {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: white;
-            font-size: 16px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-            user-select: none;
-            z-index: 100;
-            text-align: right;
-        }
-        #loadingMessage {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 24px;
-            z-index: 100;
-        }
-        #pauseMenu {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            color: white;
-            z-index: 1000;
-        }
-        #pauseMenu h2 {
-            margin-top: 0;
-            margin-bottom: 20px;
-            color: #fff;
-        }
-        .menuButton {
-            display: block;
-            width: 200px;
-            padding: 10px;
-            margin: 10px auto;
-            background-color: #444;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-        .menuButton:hover {
-            background-color: #666;
-        }
-        #crosshair {
-            position: fixed;
-            width: 32px;  /* Adjust size as needed for your image */
-            height: 32px; /* Adjust size as needed for your image */
-            z-index: 100;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            background-image: url('/assets/crosshair010.png');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            border: none;
-        }
-        /* Damage overlay for screen flash */
-        #damageOverlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 0, 0, 0);
-            pointer-events: none;
-            z-index: 99;
-            transition: background-color 0.1s ease-out;
-        }
-        /* Player health bar styles */
-        #playerHealthBarContainer {
-            width: 200px;
-            height: 20px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border: 2px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        #playerHealthBar {
-            width: 100%;
-            height: 100%;
-            background-color: #2ecc71;
-            transition: width 0.3s ease-out;
-        }
-        /* Player stamina bar styles */
-        #playerStaminaBarContainer {
-            width: 200px;
-            height: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border: 2px solid #333;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 5px;
-        }
-        #playerStaminaBar {
-            width: 100%;
-            height: 100%;
-            background-color: #3498db;
-            transition: width 0.1s linear;
-        }
-        /* Looting bar styles */
-        #lootingBarContainer {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 200px;
-            height: 20px;
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 2px solid #fff;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        #lootingBar {
-            width: 0%;
-            height: 100%;
-            background-color: #f1c40f;
-            transition: width 0.1s linear;
-        }
-        #lootingText {
-            position: fixed;
-            top: calc(50% - 30px);
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 16px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            display: none;
-        }
-        /* Highlight effect for lootable objects */
-        .highlight {
-            animation: glow 1.5s ease-in-out infinite alternate;
-        }
-        @keyframes glow {
-            from { filter: brightness(1); }
-            to { filter: brightness(1.5); }
-        }
-        /* Welcome screen styles */
-        #welcomeScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)), url('/assets/360_F_87622497_eS1A8ERnnmjoONByFMzOh9LAMehpWAo1.jpg');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            text-align: center;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-            cursor: pointer;  /* Show pointer cursor to indicate clickability */
-        }
-        #welcomeScreen h1 {
-            color: #e74c3c;
-            font-size: 48px;
-            margin-bottom: 20px;
-            text-shadow: 0 0 10px rgba(231, 76, 60, 0.5),
-                         2px 2px 4px rgba(0, 0, 0, 0.5);
-            opacity: 0;
-            animation: fadeIn 3s forwards;
-        }
-        .typed-text {
-            font-size: 18px;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 10px auto;
-            color: #ccc;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px 20px;
-            border-radius: 5px;
-            opacity: 0;
-            width: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            border-right: 2px solid #fff;
-        }
-        #startButton {
-            margin-top: 30px;
-            padding: 15px 40px;
-            font-size: 20px;
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            opacity: 0;
-            animation: buttonFlash 2s infinite;
-            animation-delay: 27s;
-        }
-        #startButton:hover {
-            background-color: #c0392b;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes typeText {
-            from { width: 0; opacity: 1; }
-            to { width: 100%; opacity: 1; }
-        }
-        @keyframes buttonFlash {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.05); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-        #reloadingIndicator {
-            display: none;
-            position: absolute;
-            top: 20px;
-            left: 150px;  /* Position it to the right of ammo text */
-            color: white;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
-            z-index: 100;
-            animation: pulse 1s infinite;
-            background: none;
-        }
-        @keyframes pulse {
-            0% { opacity: 0.7; }
-            50% { opacity: 1; }
-            100% { opacity: 0.7; }
-        }
-        #playerNameInput {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #fff;
-            color: white;
-            text-align: center;
-            z-index: 1000;
-        }
-        
-        #playerNameInput input {
-            padding: 5px;
-            margin: 5px;
-            width: 200px;
-        }
-        
-        #playerNameInput button {
-            padding: 5px 15px;
-            margin: 5px;
-            cursor: pointer;
-        }
-        
-        .player-name {
-            position: absolute;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            padding: 5px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 3px;
-            pointer-events: none;
-        }
-        #nameInputScreen {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 1000;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
-
-        #nameInputScreen h2 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        #nameInput {
-            padding: 10px;
-            font-size: 18px;
-            width: 300px;
-            margin-bottom: 20px;
-            border: none;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.9);
-        }
-
-        #joinButton {
-            padding: 10px 30px;
-            font-size: 18px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        #joinButton:hover {
-            background: #45a049;
-        }
-    </style>
-</head>
-<body>
-    <div id="welcomeScreen">
-        <h1>Welcome to Hell</h1>
-        <p class="typed-text" style="animation: typeText 4s forwards; animation-delay: 2s;">The infection has spread. The city has fallen. You are one of the last survivors.</p>
-        <p class="typed-text" style="animation: typeText 4s forwards; animation-delay: 4s;">Hordes of infected are drawn to any sign of life, and you're running out of places to hide.</p>
-        <p class="typed-text" style="animation: typeText 4s forwards; animation-delay: 8s;">Your objective: Survive as long as you can against the endless waves of the infected.</p>
-        <p class="typed-text" style="animation: typeText 4s forwards; animation-delay: 12s;">Use your flashlight to illuminate the darkness, but be warned - it will draw them to you.</p>
-        <p class="typed-text" style="animation: typeText 4s forwards; animation-delay: 16s;">Ammunition is scarce. Make every shot count.</p>
-        <button id="startButton" style="animation: buttonFlash 2s infinite; animation-delay: 20s;">Enter the Nightmare</button>
-    </div>
-    
-    <div id="gameContainer">
-        <div id="damageOverlay"></div>
-        <div id="instructions">
-            <h3>Last Ethics</h3>
-            <p>WASD - Move</p>
-            <p>Shift - Sprint</p>
-            <p>Left Click - Shoot</p>
-            <p>R - Reload</p>
-            <p>F - Toggle Flashlight</p>
-        </div>
-        <div id="ui">
-            <div style="display: flex; align-items: center;">
-                <div id="ammo">Ammo: 14/14 [98]</div>
-                <div id="reloadingIndicator">RELOADING</div>
-            </div>
-            <div id="health">Health: 100</div>
-            <div id="playerHealthBarContainer">
-                <div id="playerHealthBar"></div>
-            </div>
-            <div id="playerStaminaBarContainer">
-                <div id="playerStaminaBar"></div>
-            </div>
-        </div>
-        <div id="pauseMenu">
-            <h2>Game Paused</h2>
-            <button class="menuButton" id="resumeButton">Resume Game</button>
-            <button class="menuButton" id="restartButton">Restart Game</button>
-        </div>
-        <div id="crosshair"></div>
-        <div id="lootingBarContainer">
-            <div id="lootingBar"></div>
-        </div>
-        <div id="lootingText">Hold E to Loot</div>
-    </div>
-
-    <!-- Name Input Screen -->
-    <div id="nameInputScreen">
-        <h2>Enter Your Name</h2>
-        <input type="text" id="nameInput" placeholder="Your name..." maxlength="15">
-        <button id="joinButton">Join Game</button>
-    </div>
-
-    <script type="module" src="src/main.js"></script>
-</body>
+	<head>
+		<meta charset="utf-8">
+		<title>Zombie Top-Down Shooter</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="/css/game-ui.css">
+	</head>
+	<body>
+		<div id="gameContainer"></div>
+		
+		<div id="welcome-screen">
+			<div class="welcome-content">
+				<h1>LAST ETHICS</h1>
+				<h2>Zombie Apocalypse</h2>
+				
+				<div class="welcome-form">
+					<div class="input-group">
+						<label for="username">SURVIVOR NAME</label>
+						<input type="text" id="username" placeholder="Enter your name" maxlength="15" autofocus>
+					</div>
+					
+					<button id="join-game-btn">JOIN THE FIGHT</button>
+				</div>
+				
+				<div class="game-description">
+					<p>The world has fallen. You are humanity's last hope.</p>
+					<p>Survive. Fight. Prevail.</p>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Game Over Screen -->
+		<div id="game-over-screen" style="display: none;">
+			<div class="game-over-content">
+				<h1>GAME OVER</h1>
+				<h2>You have fallen</h2>
+				
+				<div class="stats-container">
+					<div class="stat-item">
+						<div class="stat-label">SCORE</div>
+						<div id="final-score" class="stat-value">0</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">ZOMBIES KILLED</div>
+						<div id="final-kills" class="stat-value">0</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">HIGHEST WAVE</div>
+						<div id="final-wave" class="stat-value">0</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">SURVIVAL TIME</div>
+						<div id="survival-time" class="stat-value">0:00</div>
+					</div>
+				</div>
+				
+				<button id="restart-game-btn">TRY AGAIN</button>
+			</div>
+		</div>
+		
+		<div id="ui-container">
+			<!-- Damage flash overlay -->
+			<div id="damage-flash"></div>
+			
+			<div id="instructions">
+				<h3>Last Ethics</h3>
+				<p>WASD - Move</p>
+				<p>Shift - Sprint</p>
+				<p>Left Click - Shoot</p>
+				<p>R - Reload</p>
+				<p>F - Toggle Flashlight</p>
+				<p>1-4 - Change Weapon</p>
+			</div>
+			<div id="status-panel">
+				<div class="status-container">
+					<div class="status-label">HEALTH</div>
+					<div class="bar-container">
+						<div id="health-bar" class="bar"></div>
+						<div id="health-text">100%</div>
+					</div>
+				</div>
+				
+				<div class="status-container">
+					<div class="status-label">STAMINA</div>
+					<div class="bar-container stamina-bar-container">
+						<div id="stamina-bar" class="bar"></div>
+					</div>
+				</div>
+				
+				<div class="status-container weapon-container">
+					<div class="status-label">WEAPON</div>
+					<div id="weapon-display">
+						<div id="weapon-image-container">
+							<img id="weapon-image" src="/images/GUN_01_[square_frame]_01_V1.00.png" alt="Current Weapon">
+						</div>
+						<div id="weapon-info">
+							<div id="weapon-name">Pistol</div>
+							<div id="ammo-counter">12 / 48</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div id="score-panel">
+				<div id="score-display" class="score-text">Score: 0</div>
+				<div id="kill-counter" class="score-text">Kills: 0 (R:0 | S:0 | B:0)</div>
+			</div>
+			
+			<div id="minimap-container">
+				<div class="status-label">MINIMAP</div>
+				<div id="minimap">
+					<canvas id="minimap-canvas"></canvas>
+					<div id="pulse-ring"></div>
+					<div id="player-indicator"></div>
+				</div>
+			</div>
+			
+			<div id="crosshair"></div>
+		</div>
+		
+		<script type="module" src="/src/main.js"></script>
+	</body>
 </html>
