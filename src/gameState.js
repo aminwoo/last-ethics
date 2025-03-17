@@ -13,9 +13,9 @@ export const SCORE_VALUES = {
 // Wave settings - zombies per wave increases with each wave
 export const WAVE_SETTINGS = {
     initialZombies: 20,
-    zombiesPerWaveIncrease: 14, // Increased from 3 to 6
+    zombiesPerWaveIncrease: 2, // Increased from 3 to 6
     maxWaves: 20, // Maximum number of waves (for difficulty scaling purposes)
-    timeBetweenWaves: 10, // seconds
+    timeBetweenWaves: 30, // seconds
     waveCompleteBonusScore: 500, // Bonus points for completing a wave
     
     // Scaling factors for zombie difficulty - drastically increased

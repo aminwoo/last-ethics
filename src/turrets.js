@@ -180,7 +180,7 @@ function rotateTurretToTarget(turret, targetPosition, deltaTime) {
     
     // In THREE.js, the default front direction is negative Z (0,0,-1)
     // Calculate the angle between current facing direction and target direction
-    const targetAngle = Math.atan2(direction.x, direction.z);
+    const targetAngle = Math.atan2(direction.x, direction.z) - Math.PI / 2;
     
     // Get current rotation of middle part
     let currentRotationY = turret.mount.rotation.y;
