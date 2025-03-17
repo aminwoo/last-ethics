@@ -485,9 +485,6 @@ export function handleWeaponSwitch(player, weaponIndex, switchWeaponFn, gameStat
 
 // Function to handle weapon reloading
 export function handleReload(player, reloadWeaponFn, gameState) {
-    // Check if we're reloading an Assault Rifle
-    const isAssaultRifle = gameState.weapon && gameState.weapon.name === "Assault Rifle";
-    
     if (reloadWeaponFn(gameState)) {
         SoundManager.playReload();
         return true;
