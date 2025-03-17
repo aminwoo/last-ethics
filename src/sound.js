@@ -54,13 +54,13 @@ const SOUNDS = {
     url: '/sounds/smg.mp3',
     volume: 1.0,
     category: SOUND_CATEGORIES.WEAPONS,
-    loop: true
+    loop: false
   },
   TURRET_SHOT: {
     url: '/sounds/smg.mp3',
     volume: 0.1,
     category: SOUND_CATEGORIES.WEAPONS,
-    loop: true
+    loop: false
   },
   RELOAD: {
     url: '/sounds/reload.mp3',
@@ -400,6 +400,26 @@ const SoundManager = {
   playPistolShot: () => playSound('PISTOL_SHOT', { resetTime: true }),
   playShotgunShot: () => playSound('SHOTGUN_SHOT', { resetTime: true }),
   playSmgShot: () => playSound('SMG_SHOT', { resetTime: true }),
+  stopSmgSound: () => {
+    console.log('Directly stopping SMG sound from SoundManager');
+    // Stop any SMG sound that might be playing
+    // Traverse all active loops and stop any that are SMG_SHOT
+    Object.keys(activeLoops).forEach(loopId => {
+      if (activeLoops[loopId] && activeLoops[loopId].sound && 
+          activeLoops[loopId].sound.url === SOUNDS.SMG_SHOT.url) {
+        console.log('Found SMG sound to stop:', loopId);
+        try {
+          activeLoops[loopId].source.stop();
+        } catch (e) {
+          console.warn('Error stopping sound:', e);
+        }
+        delete activeLoops[loopId];
+      }
+    });
+    
+    // Try directly stopping the sound by ID as a fallback
+    stopLoop('SMG_SHOT');
+  },
   playTurretShot: () => playSound('TURRET_SHOT', { resetTime: true }),
   playReload: () => playSound('RELOAD', { resetTime: true }),
   playEmptyClip: () => playSound('EMPTY_CLIP', { resetTime: true }),

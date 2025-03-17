@@ -101,6 +101,11 @@ function setupMouseListeners(inputState, callbacks) {
     
     window.addEventListener('mouseup', (event) => {
         inputState.mouseDown = false;
+        
+        // Call the onMouseUp callback if provided
+        if (callbacks.onMouseUp) {
+            callbacks.onMouseUp(event);
+        }
     });
 }
 
