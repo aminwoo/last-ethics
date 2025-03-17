@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { createPlayer, animatePlayerLegs } from './player.js';
 import SoundManager from './sound.js';
 
@@ -18,6 +18,48 @@ let showDetailedDebug = false;
 let chatMessages = []; // Store recent chat messages
 let onChatMessageReceived = null; // Callback when chat message is received
 const MAX_CHAT_MESSAGES = 50; // Maximum number of chat messages to store
+
+// Remote player SMG sound implementation
+let remoteSmgSounds = new Map(); // Map of player IDs to their active SMG sound instances
+let audioInitialized = false;
+
+/**
+ * Initialize audio context for remote player sounds
+ * This should be called after user interaction to satisfy browser autoplay policies
+ */
+function initRemotePlayerAudio() {
+    if (audioInitialized) return;
+    
+    console.log("Initializing remote player audio");
+    
+    // Create and play a silent sound to initialize audio context
+    try {
+        const silentSound = new Audio('./sounds/smg.mp3');
+        silentSound.volume = 0.001; // Nearly silent
+        
+        // Attempt to play the sound
+        const playPromise = silentSound.play();
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    // Successfully initialized audio
+                    console.log("Remote player audio successfully initialized");
+                    audioInitialized = true;
+                    
+                    // Stop the silent sound after a short time
+                    setTimeout(() => {
+                        silentSound.pause();
+                        silentSound.currentTime = 0;
+                    }, 100);
+                })
+                .catch(error => {
+                    console.warn("Could not initialize remote player audio:", error);
+                });
+        }
+    } catch (error) {
+        console.error("Failed to initialize remote player audio:", error);
+    }
+}
 
 // Add event listener for toggling detailed debug info
 document.addEventListener('keydown', (event) => {
@@ -213,6 +255,9 @@ function updateRemotePlayerFlashlight(flashlight, playerPosition, playerRotation
  */
 function initializeNetworking(playerUpdatedCallback, scene) {
     onPlayersUpdated = playerUpdatedCallback;
+    
+    // Initialize audio for remote players
+    initRemotePlayerAudio();
     
     // Create debug display
     createDebugDisplay();
@@ -485,13 +530,26 @@ function updateRemotePlayerTransform(playerObject, playerData) {
         );
     }
     
+    // Track whether player was previously firing
+    const wasFiring = playerObject.userData.isFiring === true;
+    const weaponType = playerObject.userData.weaponType;
+    
+    // Update firing state
+    playerObject.userData.isFiring = playerData.isFiring;
+    playerObject.userData.weaponType = playerData.weaponType;
+    
     // Handle weapon firing
     if (playerData.isFiring) {
         // Create muzzle flash for remote player
         createRemotePlayerMuzzleFlash(playerObject, playerData.weaponType);
         
         // Play appropriate weapon sound
-        playRemotePlayerWeaponSound(playerData.weaponType);
+        playRemotePlayerWeaponSound(playerData.weaponType, playerData.id);
+    } 
+    // Check if player stopped firing an Assault Rifle
+    else if (wasFiring && !playerData.isFiring && weaponType === 'Assault Rifle') {
+        // Stop the remote SMG sound
+        stopRemoteSmgSound(playerData.id);
     }
     
     // Check if player is moving by comparing positions
@@ -507,48 +565,69 @@ function updateRemotePlayerTransform(playerObject, playerData) {
     // Using a small deltaTime value for smooth animation
     const deltaTime = 0.016; // ~60fps
     animatePlayerLegs(playerObject, isMoving, deltaTime, false);
+    
+    // Ensure stale sounds are cleaned up on every player transform update
+    if (playerData.id) {
+        // This is a critical spot where we need to ensure weapon sounds
+        // are properly managed, especially for Assault Rifle
+        cleanupStaleSounds();
+    }
 }
 
 /**
- * Remove a remote player from the scene
- * @param {number} playerId - ID of the player to remove
+ * Remove a remote player
+ * @param {string} playerId - The ID of the player to remove
  * @param {THREE.Scene} scene - The game scene
  */
 function removeRemotePlayer(playerId, scene) {
-    const remotePlayer = remotePlayers.get(playerId);
-    if (remotePlayer) {
-        // Also remove the flashlight and target if they exist
-        if (remotePlayer.userData.flashlight) {
-            scene.remove(remotePlayer.userData.flashlight.group);
-            scene.remove(remotePlayer.userData.flashlight.target);
-        }
-        
-        // Find and explicitly dispose of all CSS2D objects
-        const css2DObjects = [];
-        remotePlayer.traverse((child) => {
-            if (child instanceof CSS2DObject) {
-                css2DObjects.push(child);
-                
-                // Remove the HTML element from the DOM
-                if (child.element && child.element.parentNode) {
-                    child.element.parentNode.removeChild(child.element);
-                }
-            }
-        });
-        
-        // Remove CSS2D objects from parent before removing the player
-        css2DObjects.forEach(obj => {
-            if (obj.parent) {
-                obj.parent.remove(obj);
-            }
-        });
-        
-        // Now remove the player from the scene
-        scene.remove(remotePlayer);
-        remotePlayers.delete(playerId);
-        
-        console.log(`Removed player ${playerId} and cleaned up ${css2DObjects.length} name tags`);
+    if (!remotePlayers.has(playerId)) {
+        console.warn(`Remote player ${playerId} doesn't exist, can't remove`);
+        return;
     }
+    
+    const playerObject = remotePlayers.get(playerId);
+    
+    // Stop any active SMG sound for this player
+    stopRemoteSmgSound(playerId);
+    
+    // Find and explicitly dispose of all CSS2D objects (name tags)
+    const css2DObjects = [];
+    playerObject.traverse((child) => {
+        if (child instanceof CSS2DObject) {
+            css2DObjects.push(child);
+            
+            // Remove the HTML element from the DOM
+            if (child.element && child.element.parentNode) {
+                child.element.parentNode.removeChild(child.element);
+            }
+        }
+    });
+    
+    // Remove CSS2D objects from parent before removing the player
+    css2DObjects.forEach(obj => {
+        if (obj.parent) {
+            obj.parent.remove(obj);
+        }
+    });
+    
+    // Remove flashlight if it exists
+    if (playerObject.userData.flashlight) {
+        if (playerObject.userData.flashlight.group) {
+            scene.remove(playerObject.userData.flashlight.group);
+        }
+        if (playerObject.userData.flashlight.target) {
+            scene.remove(playerObject.userData.flashlight.target);
+        }
+    }
+    
+    // Remove player from scene
+    scene.remove(playerObject);
+    
+    // Remove from tracking Map
+    remotePlayers.delete(playerId);
+    
+    console.log(`Remote player ${playerId} removed from scene (cleaned up ${css2DObjects.length} name tags)`);
+    console.log(`Remaining remote players: ${remotePlayers.size}`);
 }
 
 /**
@@ -607,13 +686,49 @@ function getRemotePlayers() {
 }
 
 /**
- * Clean up network resources
+ * Clean up networking resources
  */
 function cleanupNetworking() {
-    if (socket) {
+    // Close the WebSocket
+    if (socket && socket.readyState === WebSocket.OPEN) {
         socket.close();
     }
+    
+    // Reset variables
+    socket = null;
+    isSocketOpen = false;
+    
+    // Stop all remote player SMG sounds
+    remoteSmgSounds.forEach((soundData, playerId) => {
+        if (soundData.active) {
+            stopRemoteSmgSound(playerId);
+        }
+    });
+    remoteSmgSounds.clear();
+    
+    // Clear all remote players (scene removal should be handled by the caller)
     remotePlayers.clear();
+    
+    // Reset chat history
+    chatMessages.length = 0;
+    
+    console.log('Network resources cleaned up');
+}
+
+/**
+ * Clean up any stale sound instances that haven't been updated recently
+ * This helps prevent stuck sounds if we miss a player stopping firing
+ */
+function cleanupStaleSounds() {
+    const now = Date.now();
+    const STALE_THRESHOLD = 300; // Reduced from 500ms to 300ms for more aggressive cleanup
+    
+    remoteSmgSounds.forEach((soundData, playerId) => {
+        if (soundData.active && (now - soundData.lastUpdated > STALE_THRESHOLD)) {
+            console.log(`Auto-stopping stale SMG sound for player ${playerId} (${now - soundData.lastUpdated}ms old)`);
+            stopRemoteSmgSound(playerId);
+        }
+    });
 }
 
 /**
@@ -622,6 +737,9 @@ function cleanupNetworking() {
 function updateNetworking() {
     // Update debug display
     updateDebugDisplay();
+    
+    // Cleanup any stale sound instances
+    cleanupStaleSounds();
     
     // Update animations for remote players
     const deltaTime = 0.016; // ~60fps
@@ -772,6 +890,10 @@ function updateRemotePlayer(playerData) {
             console.error('Cannot add player - scene not available');
         }
     }
+    
+    // Check for stale sounds with each player update
+    // This ensures we stop sounds quickly if a player stops firing but we miss the event
+    cleanupStaleSounds();
 }
 
 /**
@@ -1082,9 +1204,13 @@ function createRemotePlayerBullets(scene, playerObject, weaponType) {
 /**
  * Plays weapon sounds for remote players with distance-based volume
  * @param {string} weaponType - The type of weapon being fired
+ * @param {string} playerId - The ID of the remote player
  */
-function playRemotePlayerWeaponSound(weaponType) {
-    if (!SoundManager) return;
+function playRemotePlayerWeaponSound(weaponType, playerId) {
+    if (!playerId) {
+        console.warn('Missing player ID for remote weapon sound');
+        return;
+    }
     
     // Play appropriate weapon sound at reduced volume for remote players
     switch(weaponType) {
@@ -1093,20 +1219,59 @@ function playRemotePlayerWeaponSound(weaponType) {
                 SoundManager.playShotgunShot(0.5); // 50% volume
             }
             break;
-        case 'Assault Rifle':
-            if (SoundManager.playRifleShot) {
-                SoundManager.playRifleShot(0.5);
-            }
-            break;
         case 'Sniper Rifle':
-            if (SoundManager.playRifleShot) {
-                SoundManager.playRifleShot(0.5);
+            if (SoundManager.playPistolShot) {
+                SoundManager.playPistolShot(0.5);
             }
             break;
         default: // Pistol or default
             if (SoundManager.playPistolShot) {
                 SoundManager.playPistolShot(0.5);
             }
+    }
+}
+
+/**
+ * Stops the SMG sound for a specific remote player
+ * @param {string} playerId - The ID of the remote player
+ */
+function stopRemoteSmgSound(playerId) {
+    console.log(`Attempting to stop SMG sound for player ${playerId}`);
+    
+    if (remoteSmgSounds.has(playerId)) {
+        const soundData = remoteSmgSounds.get(playerId);
+        
+        if (soundData.active) {
+            console.log(`Stopping active SMG sound for remote player ${playerId} (last updated ${Date.now() - soundData.lastUpdated}ms ago)`);
+            
+            // Stop the specific audio instance if we have one
+            if (soundData.audio) {
+                try {
+                    console.log(`Using direct audio control to stop sound for player ${playerId}`);
+                    soundData.audio.pause();
+                    soundData.audio.currentTime = 0;
+                } catch (error) {
+                    console.error(`Error stopping SMG sound for player ${playerId}:`, error);
+                }
+            } else {
+                console.log(`No direct audio control for player ${playerId}, using SoundManager fallback`);
+            }
+            
+            // Use SoundManager as a fallback
+            if (SoundManager && SoundManager.stopSmgSound) {
+                console.log(`Calling SoundManager.stopSmgSound() for player ${playerId}`);
+                SoundManager.stopSmgSound();
+            }
+            
+            // Mark the sound as inactive
+            soundData.active = false;
+            remoteSmgSounds.set(playerId, soundData);
+            console.log(`Successfully marked sound for player ${playerId} as inactive`);
+        } else {
+            console.log(`SMG sound for player ${playerId} is already inactive, no action needed`);
+        }
+    } else {
+        console.log(`No SMG sound data found for player ${playerId}`);
     }
 }
 
@@ -1236,6 +1401,7 @@ function createPlayerDeathEffect(position, scene) {
     }, 300);
 }
 
+// Export networking functions
 export {
     initializeNetworking,
     sendPlayerUpdate,
@@ -1250,5 +1416,7 @@ export {
     createPlayerNameTag,
     createRemotePlayerFlashlight,
     updateRemotePlayerFlashlight,
-    sendPlayerDeathEvent
+    sendPlayerDeathEvent,
+    stopRemoteSmgSound,
+    initRemotePlayerAudio
 }; 

@@ -301,6 +301,16 @@ async function initializeGame() {
             if (!chat || !chat.isTyping()) {
                 handleShooting(input, player, scene, gameState);
             }
+        },
+        onMouseUp: () => {
+            // Stop the SMG sound when mouse is released for Assault Rifle
+            if (gameState.weapon && gameState.weapon.name === "Assault Rifle") {
+                stopSmgSound();
+                
+                // Send a network update to inform other clients that we've stopped firing
+                sendPlayerUpdate(player, false, gameState.weapon.name);
+                console.log("Sent stop firing update for Assault Rifle");
+            }
         }
     });
 
@@ -495,11 +505,6 @@ function animate(time) {
         if (!chat || !chat.isTyping()) {
             handleShooting(input, player, scene, gameState);
         }
-    }
-    // Stop the assault rifle sound when mouse button is released
-    else if (!input.mouseDown && gameState.weapon && gameState.weapon.name === "Assault Rifle") {
-        // Stop the SMG sound
-        stopSmgSound();
     }
     
     // Update player movement and direction

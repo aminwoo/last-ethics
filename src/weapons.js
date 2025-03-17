@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import SoundManager from './sound.js';
 import { applyScreenShake } from './effects.js';
 
+// SMG sound implementation
+let smgShotSound = new Audio('./assets/sounds/smg.mp3');
+let isSmgFiring = false;
+
 export const weapons = [
     {
         name: "Pistol",
@@ -88,6 +92,7 @@ let bullets = [];
 
 // Create bullet model (for reuse)
 let bulletModel;
+
 function initBulletModel() {
     const bulletGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.3, 8);
     bulletGeometry.rotateX(Math.PI / 2);  // Rotate to point forward
@@ -100,8 +105,6 @@ function initBulletModel() {
     });
     bulletModel = new THREE.Mesh(bulletGeometry, bulletMaterial);
 }
-
-let isSmgFiring = false;
 
 // Constants for bullet system
 const BULLET_LIFE_TIME = 8000; // milliseconds - increased from 3000 to 8000
@@ -466,9 +469,6 @@ export function updatePlayerArmsForWeapon(player, gameState) {
 
 // Function to handle weapon switching
 export function handleWeaponSwitch(player, weaponIndex, switchWeaponFn, gameState) {
-    // Check if we're switching from an Assault Rifle
-    const isLeavingAssaultRifle = gameState.weapon.name === "Assault Rifle";
-    
     // Use the imported switchWeapon function
     if (switchWeaponFn(gameState, weaponIndex)) {
         // Update player model to reflect the new weapon
@@ -479,30 +479,17 @@ export function handleWeaponSwitch(player, weaponIndex, switchWeaponFn, gameStat
             SoundManager.playWeaponSwitch();
         }
         
-        // If we were using an Assault Rifle, stop the SMG sound
-        if (isLeavingAssaultRifle) {
-            stopSmgSound();
-        }
-        
         return true;
     }
     
     return false;
 }
 
-// Function to stop the SMG sound
-export function stopSmgSound() {
-    // Reset firing flag
-    isSmgFiring = false;
-    
-    // Stop the looping sound
-    if (SoundManager.stopLoop) {
-        SoundManager.stopLoop('SMG_SHOT');
-    }
-}
-
 // Function to handle weapon reloading
 export function handleReload(player, reloadWeaponFn, gameState) {
+    // Check if we're reloading an Assault Rifle
+    const isAssaultRifle = gameState.weapon && gameState.weapon.name === "Assault Rifle";
+    
     if (reloadWeaponFn(gameState)) {
         SoundManager.playReload();
         return true;
@@ -743,6 +730,16 @@ export function handleShooting(input, player, scene, gameState) {
     
     // Check if weapon is currently reloading
     if (weapon.isReloading) {
+        // If we're reloading the assault rifle, stop the sound
+        if (weapon.name === "Assault Rifle" && isSmgFiring) {
+            stopSmgSound();
+            
+            // Send a network update to inform other clients we've stopped firing
+            if (window.sendPlayerUpdate) {
+                window.sendPlayerUpdate(player, false, weapon.name);
+                console.log("Sent stop firing update for Assault Rifle (during reloading)");
+            }
+        }
         return false;
     }
     
@@ -762,13 +759,25 @@ export function handleShooting(input, player, scene, gameState) {
         
         if (weapon.name === "Shotgun" && SoundManager.playShotgunShot) {
             SoundManager.playShotgunShot();
-        } else if (weapon.name === "Assault Rifle" && SoundManager.playSmgShot) {
-            // Set flag to indicate SMG is firing to help with sound management
-            isSmgFiring = true;
-            SoundManager.playSmgShot();
+        } else if (weapon.name === "Assault Rifle") {
+            // For assault rifle, use our custom audio element
+            /*if (!isSmgFiring) {
+                try {
+                    smgShotSound.currentTime = 0;
+                    smgShotSound.play()
+                        .catch(error => console.error("Error playing SMG sound:", error));
+                    isSmgFiring = true;saaaaaaa
+                    console.log("Started SMG sound");
+                } catch (error) {
+                    console.error("Failed to play SMG sound:", error);
+                    // Fallback to SoundManager if our custom approach fails
+                    if (SoundManager.playSmgShot) {
+                        SoundManager.playSmgShot();
+                    }
+                }
+            }*/
         } else if (weapon.name === "Sniper Rifle" && SoundManager.playRifleShot) {
             SoundManager.playRifleShot();
-
         } else if (SoundManager.playPistolShot) {
             SoundManager.playPistolShot();
         }
@@ -794,6 +803,17 @@ export function handleShooting(input, player, scene, gameState) {
         
         return true;
     } else if (weapon.ammo <= 0) {
+        // If we're out of ammo with the assault rifle, stop the sound
+        if (weapon.name === "Assault Rifle" && isSmgFiring) {
+            stopSmgSound();
+            
+            // Send a network update to inform other clients we've stopped firing
+            if (window.sendPlayerUpdate) {
+                window.sendPlayerUpdate(player, false, weapon.name);
+                console.log("Sent stop firing update for Assault Rifle (out of ammo)");
+            }
+        }
+        
         // Play empty gun sound (if available)
         if (SoundManager.playEmptyClip) {
             SoundManager.playEmptyClip();
@@ -1385,4 +1405,12 @@ export function resetBullets(scene) {
     
     // Reset bullet model
     bulletModel = null;
+}
+
+// Function to stop the SMG sound
+export function stopSmgSound() {
+    smgShotSound.pause();
+    smgShotSound.currentTime = 0;
+    isSmgFiring = false;
+    console.log("Stopped SMG sound");
 }
