@@ -12,7 +12,7 @@ export const SCORE_VALUES = {
 
 // Wave settings - zombies per wave increases with each wave
 export const WAVE_SETTINGS = {
-    initialZombies: 20,
+    initialZombies: 5,
     zombiesPerWaveIncrease: 2, // Increased from 3 to 6
     maxWaves: 20, // Maximum number of waves (for difficulty scaling purposes)
     timeBetweenWaves: 30, // seconds
@@ -30,10 +30,38 @@ export const WAVE_SETTINGS = {
     // Wave composition (percentage of different zombie atypes)
     composition: [
         // Wave 1-3: Mostly regular zombies, few runners
-        { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0 },
-        { REGULAR: 0.35, RUNNER: 0.50, BRUTE: 0.15 },
-        { REGULAR: 0.25, RUNNER: 0.55, BRUTE: 0.20 },
-        { REGULAR: 0, RUNNER: 0.80, BRUTE: 0.20 },
+        { REGULAR: 1.00, RUNNER: 0.00, BRUTE: 0.00 },  // Wave 1: 100% Regular zombies
+        { REGULAR: 0.95, RUNNER: 0.05, BRUTE: 0.00 },  // Wave 2: Introduce small number of Runners
+        { REGULAR: 0.90, RUNNER: 0.10, BRUTE: 0.00 },  // Wave 3: Slight increase in Runners
+        
+        // Wave 4-6: Gradually increase runners, still mostly regulars
+        { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0.00 },  // Wave 4: More Runners
+        { REGULAR: 0.80, RUNNER: 0.20, BRUTE: 0.00 },  // Wave 5: Even more Runners 
+        { REGULAR: 0.75, RUNNER: 0.25, BRUTE: 0.00 },  // Wave 6: Quarter of zombies are Runners
+        
+        // Wave 7-9: Introduce brutes, reduce regulars further
+        { REGULAR: 0.70, RUNNER: 0.25, BRUTE: 0.05 },  // Wave 7: Introduce small number of Brutes
+        { REGULAR: 0.65, RUNNER: 0.30, BRUTE: 0.05 },  // Wave 8: Increase Runners slightly
+        { REGULAR: 0.60, RUNNER: 0.30, BRUTE: 0.10 },  // Wave 9: Increase Brutes slightly
+        
+        // Wave 10-12: Continue gradual scaling
+        { REGULAR: 0.55, RUNNER: 0.35, BRUTE: 0.10 },  // Wave 10: More Runners
+        { REGULAR: 0.50, RUNNER: 0.35, BRUTE: 0.15 },  // Wave 11: More Brutes
+        { REGULAR: 0.45, RUNNER: 0.40, BRUTE: 0.15 },  // Wave 12: Fewer Regulars, more Runners
+        
+        // Wave 13-15: Runners become the main type
+        { REGULAR: 0.40, RUNNER: 0.45, BRUTE: 0.15 },  // Wave 13: Runners outnumber Regulars
+        { REGULAR: 0.35, RUNNER: 0.50, BRUTE: 0.15 },  // Wave 14: Half are Runners
+        { REGULAR: 0.30, RUNNER: 0.50, BRUTE: 0.20 },  // Wave 15: Increase Brutes to 20%
+        
+        // Wave 16-18: Continue reducing regulars
+        { REGULAR: 0.25, RUNNER: 0.55, BRUTE: 0.20 },  // Wave 16: More Runners, fewer Regulars
+        { REGULAR: 0.20, RUNNER: 0.60, BRUTE: 0.20 },  // Wave 17: 60% Runners
+        { REGULAR: 0.15, RUNNER: 0.65, BRUTE: 0.20 },  // Wave 18: 65% Runners
+        
+        // Wave 19-20: Final scaling
+        { REGULAR: 0.10, RUNNER: 0.70, BRUTE: 0.20 },  // Wave 19: Mostly Runners and Brutes
+        { REGULAR: 0.00, RUNNER: 0.80, BRUTE: 0.20 },  // Wave 20: No more Regular zombies
     ]
 };
 
