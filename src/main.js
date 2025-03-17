@@ -28,7 +28,6 @@ import {
     resetBullets,
     getBulletModel,
     addRemoteBullet,
-    stopSmgSound
 } from './weapons.js';
 import { updateScreenShake } from './effects.js';
 import * as ZombieSystem from './zombies.js';
@@ -219,7 +218,6 @@ async function startGame() {
             initializeGame();
         }, 1000);
     } catch (error) {
-        console.error("Failed to initialize audio:", error);
         // Continue with the game even if audio fails
         welcomeScreen.style.opacity = '0';
         welcomeScreen.style.transition = 'opacity 1s ease-out';
@@ -259,7 +257,6 @@ async function initializeGame() {
 
     // Create turrets at player spawn position
     turrets = createSpawnTurrets(scene, player.position);
-    console.log(`Created ${turrets.length} automatic turrets near player spawn`);
 
     // Make gameState available globally for network code
     window.gameState = gameState;
@@ -273,7 +270,6 @@ async function initializeGame() {
         await initializeNetworking((playerCount) => {
             updateMultiplayerStatus(playerCount);
         }, scene);
-        console.log('Networking initialized successfully');
         
         // Make sendPlayerUpdate available globally for weapon firing updates
         window.sendPlayerUpdate = sendPlayerUpdate;
@@ -303,14 +299,7 @@ async function initializeGame() {
             }
         },
         onMouseUp: () => {
-            // Stop the SMG sound when mouse is released for Assault Rifle
-            if (gameState.weapon && gameState.weapon.name === "Assault Rifle") {
-                stopSmgSound();
-                
-                // Send a network update to inform other clients that we've stopped firing
-                sendPlayerUpdate(player, false, gameState.weapon.name);
-                console.log("Sent stop firing update for Assault Rifle");
-            }
+
         }
     });
 

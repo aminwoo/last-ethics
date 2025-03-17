@@ -17,8 +17,8 @@ const SOUND_CATEGORIES = {
 
 // Master volume controls
 const masterVolume = {
-  master: 1.0,
-  [SOUND_CATEGORIES.WEAPONS]: 1.0,
+  master: 0.5,
+  [SOUND_CATEGORIES.WEAPONS]: 0.5,
   [SOUND_CATEGORIES.AMBIENT]: 0.8,
   [SOUND_CATEGORIES.UI]: 1.0,
   [SOUND_CATEGORIES.PLAYER]: 1.0,
@@ -30,7 +30,6 @@ function getAudioContext() {
   if (!audioContext) {
     // Create new AudioContext when it's first needed
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    console.log('AudioContext created with state:', audioContext.state);
   }
   return audioContext;
 }
@@ -39,25 +38,31 @@ function getAudioContext() {
 const SOUNDS = {
   // Weapon sounds
   PISTOL_SHOT: {
-    url: '/sounds/pistol.mp3',
-    volume: 0.7,
+    url: '/sounds/pistol_shot.mp3',
+    volume: 0.2,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
   SHOTGUN_SHOT: {
-    url: '/sounds/shotgun.mp3',
-    volume: 0.8,
+    url: '/sounds/shotgun_shot.mp3',
+    volume: 0.3,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
-  SMG_SHOT: {
-    url: '/sounds/smg.mp3',
-    volume: 1.0,
+  AR_SHOT: {
+    url: '/sounds/ak47_shot.mp3',
+    volume: 0.5,
+    category: SOUND_CATEGORIES.WEAPONS,
+    loop: false
+  },
+  RIFLE_SHOT: {
+    url: '/sounds/rifle_shot.wav',
+    volume: 0.5,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
   },
   TURRET_SHOT: {
-    url: '/sounds/smg.mp3',
+    url: '/sounds/pistol_shot.mp3',
     volume: 0.1,
     category: SOUND_CATEGORIES.WEAPONS,
     loop: false
@@ -76,7 +81,7 @@ const SOUNDS = {
     loop: false
   },
   PLAYER_DEATH: {
-    url: '/sounds/731506__soundbitersfx__npcplayer-death-groans-male(1)-[AudioTrimmer.com].wav',
+    url: '/sounds/death.wav',
     volume: 1.0,
     category: SOUND_CATEGORIES.PLAYER,
     loop: false
@@ -193,13 +198,11 @@ async function loadSound(soundId, soundDef) {
 async function playSound(soundId, options = {}) {
   // Ensure the sound system is initialized
   if (!isInitialized) {
-    console.log(`Waiting for sound system to initialize before playing ${soundId}...`);
     await initSoundSystem();
   }
   
   const sound = loadedSounds[soundId];
   if (!sound) {
-    console.warn(`Sound ${soundId} not loaded`);
     return null;
   }
   
@@ -399,27 +402,8 @@ const SoundManager = {
   // Weapon sound shortcuts
   playPistolShot: () => playSound('PISTOL_SHOT', { resetTime: true }),
   playShotgunShot: () => playSound('SHOTGUN_SHOT', { resetTime: true }),
-  playSmgShot: () => playSound('SMG_SHOT', { resetTime: true }),
-  stopSmgSound: () => {
-    console.log('Directly stopping SMG sound from SoundManager');
-    // Stop any SMG sound that might be playing
-    // Traverse all active loops and stop any that are SMG_SHOT
-    Object.keys(activeLoops).forEach(loopId => {
-      if (activeLoops[loopId] && activeLoops[loopId].sound && 
-          activeLoops[loopId].sound.url === SOUNDS.SMG_SHOT.url) {
-        console.log('Found SMG sound to stop:', loopId);
-        try {
-          activeLoops[loopId].source.stop();
-        } catch (e) {
-          console.warn('Error stopping sound:', e);
-        }
-        delete activeLoops[loopId];
-      }
-    });
-    
-    // Try directly stopping the sound by ID as a fallback
-    stopLoop('SMG_SHOT');
-  },
+  playARShot: () => playSound('AR_SHOT', { resetTime: true }),
+  playRifleShot: () => playSound('RIFLE_SHOT', { resetTime: true }),
   playTurretShot: () => playSound('TURRET_SHOT', { resetTime: true }),
   playReload: () => playSound('RELOAD', { resetTime: true }),
   playEmptyClip: () => playSound('EMPTY_CLIP', { resetTime: true }),

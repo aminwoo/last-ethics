@@ -239,9 +239,9 @@ function fireTurretBullet(turret, scene, targetPosition) {
     createMuzzleFlash(turret, scene);
     
     // Play shooting sound
-    //if (SoundManager) {
-    //    SoundManager.playTurretShot(); // Lower volume for turret
-    //}
+    if (SoundManager) {
+        SoundManager.playTurretShot(); 
+    }
     
     // Store bullet data
     turret.bullets.push({
@@ -446,11 +446,6 @@ export function createSpawnTurrets(scene, playerPosition) {
     const turret2 = createTurret(
         scene,
         new THREE.Vector3(playerPosition.x + 5, 0, playerPosition.z - 5)
-    );
-    
-    console.log('Created spawn turrets at:', 
-        turret1.object.position, 
-        turret2.object.position
     );
     
     return [turret1, turret2];
