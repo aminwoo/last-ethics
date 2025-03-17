@@ -127,7 +127,9 @@ export function createTurret(scene, position) {
         rotationSpeed: TURRET_ROTATION_SPEED,
         ammo: Infinity, // Unlimited ammo for turrets
         active: true,
-        bullets: []
+        bullets: [],
+        // Add initial direction the turret is facing
+        initialDirection: new THREE.Vector3(0, 0, -1)
     };
     
     // Add to global turrets array
@@ -171,34 +173,35 @@ function rotateTurretToTarget(turret, targetPosition, deltaTime) {
     const turretPosition = new THREE.Vector3();
     turret.object.getWorldPosition(turretPosition);
     
+    // Vector from turret to target
     const direction = new THREE.Vector3().subVectors(targetPosition, turretPosition);
-    //direction.y = 0; // Keep rotation on xz plane
+    direction.y = 0; // Keep rotation on xz plane only
+    direction.normalize();
     
-    // Calculate target rotation
+    // In THREE.js, the default front direction is negative Z (0,0,-1)
+    // Calculate the angle between current facing direction and target direction
     const targetAngle = Math.atan2(direction.x, direction.z);
     
-    // Get current rotation
+    // Get current rotation of middle part
     let currentRotationY = turret.mount.rotation.y;
     
-    // Calculate the shortest rotation to the target angle
+    // Calculate the shortest path to rotate
     let angleDifference = targetAngle - currentRotationY;
+    
+    // Normalize the angle to be between -PI and PI
     while (angleDifference > Math.PI) angleDifference -= Math.PI * 2;
     while (angleDifference < -Math.PI) angleDifference += Math.PI * 2;
     
-    // Determine rotation amount based on speed and delta time
+    // Calculate how much to rotate this frame based on rotation speed
     const rotationAmount = Math.min(
         Math.abs(angleDifference),
         turret.rotationSpeed * deltaTime
     ) * Math.sign(angleDifference);
     
-    // Apply rotation to the middle part (which the mount is attached to)
+    // Apply the rotation to the middle part
     turret.mount.rotation.y += rotationAmount;
     
-    // Make the barrel point forward relative to the mount
-    // This ensures the barrel is always pointing in the direction the turret is facing
-    turret.barrel.rotation.z = 0;
-    
-    // Check if we're close enough to target rotation
+    // Return true if we're close enough to the target angle
     return Math.abs(angleDifference) < 0.1;
 }
 
@@ -213,18 +216,8 @@ function fireTurretBullet(turret, scene, targetPosition) {
     const bulletPosition = new THREE.Vector3();
     turret.bulletSpawn.getWorldPosition(bulletPosition);
     
-    // Get the barrel's forward direction in world space
-    const forward = new THREE.Vector3(1, 0, 0); // Local forward direction of the barrel
-    const barrel = turret.barrel;
-    
-    // Get the barrel's world direction by applying its world transformation
-    const worldMatrix = new THREE.Matrix4();
-    barrel.updateMatrixWorld();
-    worldMatrix.extractRotation(barrel.matrixWorld);
-    forward.applyMatrix4(worldMatrix);
-    
-    // Use the barrel's direction as the firing direction
-    const direction = forward.normalize();
+    // Calculate direction to target - this ensures bullets go toward the target
+    const direction = new THREE.Vector3().subVectors(targetPosition, bulletPosition).normalize();
     
     // Create bullet
     const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
