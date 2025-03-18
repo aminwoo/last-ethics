@@ -31,6 +31,9 @@ function setupKeyboardListeners(inputState, callbacks) {
             case 'r': 
                 if (callbacks.onReload) callbacks.onReload();
                 break;
+            case 'f':
+                if (callbacks.onFlashlightToggle) callbacks.onFlashlightToggle();
+                break;
             case '1': 
                 if (callbacks.onWeaponSwitch) callbacks.onWeaponSwitch(0);
                 break;
