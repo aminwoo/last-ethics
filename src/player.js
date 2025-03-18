@@ -172,12 +172,7 @@ function createPlayer() {
         animationTime: 0,
         isWalking: false,
         walkSpeed: 1.0,
-        batSwingAnimation: {
-            isSwinging: false,
-            startPosition: { x: 0, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0 },
-            progress: 0,
-            duration: 0.5  // in seconds
-        }
+        flashlightOn: true
     };
     
     return player; 
@@ -186,8 +181,6 @@ function createPlayer() {
 // Initialize player with the current weapon
 function initializePlayer(scene, gameState) {
     const playerObj = createPlayer();
-    // Set initial arm positions based on starting weapon
-    Weapons.updatePlayerArmsForWeapon(playerObj, gameState);
     scene.add(playerObj);
     return playerObj;
 }

@@ -383,95 +383,11 @@ export function createWeaponModels(leftForearmGroup) {
     return weaponModels;
 }
 
-// Function to update player arms based on weapon type
-export function updatePlayerArmsForWeapon(player, gameState) {
-    const userData = player.userData;
-    const weapon = gameState.weapon;
-    
-    // Hide all weapons first
-    userData.weapons.pistol.visible = false;
-    userData.weapons.shotgun.visible = false;
-    userData.weapons.baseballBat.visible = false;
-    userData.weapons.assaultRifle.visible = false;
-    userData.weapons.sniperRifle.visible = false;
-    
-    if (weapon.type === "melee") {
-        // Baseball bat
-        userData.weapons.baseballBat.visible = true;
-        
-        // Set arms position for baseball bat (both arms forward, ready to swing)
-        userData.leftArm.upper.rotation.x = -Math.PI / 2.5;
-        userData.leftArm.upper.rotation.y = 0;
-        userData.leftArm.upper.rotation.z = -Math.PI / 8;
-        
-        userData.rightArm.upper.rotation.x = -Math.PI / 2.5;
-        userData.rightArm.upper.rotation.y = 0;
-        userData.rightArm.upper.rotation.z = Math.PI / 8;
-        
-        // Position forearms
-        userData.leftArm.forearm.rotation.x = Math.PI / 8;
-        userData.rightArm.forearm.rotation.x = Math.PI / 8;
-    } else if (weapon.twoHanded) {
-        // Determine which two-handed weapon to show
-        if (weapon.name === "Assault Rifle") {
-            userData.weapons.assaultRifle.visible = true;
-        } else if (weapon.name === "Sniper Rifle") {
-            userData.weapons.sniperRifle.visible = true;
-        } else {
-            // Shotgun
-            userData.weapons.shotgun.visible = true;
-        }
-        
-        // Left arm already points forward for aiming
-        
-        // Adjust right arm to also point forward for supporting the two-handed weapon
-        userData.rightArm.upper.rotation.x = -Math.PI / 2.2; // Slightly different angle than left arm
-        userData.rightArm.upper.rotation.y = 0;
-        userData.rightArm.upper.rotation.z = 0;
-        
-        // Position right forearm
-        userData.rightArm.forearm.rotation.x = Math.PI / 10;
-        
-        // Special positioning for sniper rifle - slightly different posture
-        if (weapon.name === "Sniper Rifle") {
-            // Adjust arms to be steady for precision aiming
-            userData.leftArm.upper.rotation.x = -Math.PI / 1.9; // More vertical
-            userData.rightArm.upper.rotation.x = -Math.PI / 1.9;
-            
-            // Tilt slightly to look through scope
-            userData.leftArm.upper.rotation.y = Math.PI / 32;
-            userData.rightArm.upper.rotation.y = Math.PI / 32;
-        }
-    } else {
-        // Pistol
-        userData.weapons.pistol.visible = true;
-        
-        // Left arm already points forward for aiming
-        userData.leftArm.upper.rotation.x = -Math.PI / 2;
-        userData.leftArm.upper.rotation.y = 0;
-        userData.leftArm.upper.rotation.z = 0;
-        
-        // Reset right arm to hanging position
-        userData.rightArm.upper.rotation.x = 0;
-        userData.rightArm.upper.rotation.y = 0;
-        userData.rightArm.upper.rotation.z = 0;
-        
-        // Reset right forearm
-        userData.rightArm.forearm.rotation.x = 0;
-    }
-    
-    // Reset the bat swing animation state
-    userData.batSwingAnimation.isSwinging = false;
-    userData.batSwingAnimation.progress = 0;
-}
 
 // Function to handle weapon switching
 export function handleWeaponSwitch(player, weaponIndex, switchWeaponFn, gameState) {
     // Use the imported switchWeapon function
-    if (switchWeaponFn(gameState, weaponIndex)) {
-        // Update player model to reflect the new weapon
-        updatePlayerArmsForWeapon(player, gameState);
-        
+    if (switchWeaponFn(gameState, weaponIndex)) {        
         // Play weapon switch sound (if available)
         if (SoundManager.playWeaponSwitch) {
             SoundManager.playWeaponSwitch();

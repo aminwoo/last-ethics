@@ -237,11 +237,9 @@ function fireTurretBullet(turret, scene, targetPosition) {
     
     // Create muzzle flash
     createMuzzleFlash(turret, scene);
-    
+            
     // Play shooting sound
-    if (SoundManager) {
-        SoundManager.playTurretShot(); 
-    }
+    SoundManager.playSound('TURRET_SHOT', 0.1); 
     
     // Store bullet data
     turret.bullets.push({
