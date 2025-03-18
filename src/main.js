@@ -7,7 +7,8 @@ import {
     switchWeapon, 
     reloadWeapon, 
     initializeGameState,
-    getWaveInfo
+    getWaveInfo,
+    toggleFlashlight
 } from './gameState.js';
 import { initializeUI, updateUI, updateCrosshair, initializeMinimap, updateMinimap } from './ui.js';
 import { initializeInput, setupKeyboardListeners, setupMouseListeners, setupResizeListener } from './input.js';
@@ -315,6 +316,14 @@ async function initializeGame() {
             // Only allow weapon switching if not typing in chat
             if (!chat || !chat.isTyping()) {
                 handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState);
+            }
+        },
+        onFlashlightToggle: () => {
+            // Only allow flashlight toggle if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                toggleFlashlight();
+                // Play a click sound for feedback
+                SoundManager.playSound('CLICK', 0.3);
             }
         }
     });

@@ -117,6 +117,17 @@ function updateFlashlight(flashlight, playerPosition, direction) {
     // Update flashlight and glow position relative to player
     flashlight.light.position.set(0, 1.5, 0);
     flashlight.glow.position.copy(flashlight.light.position);
+    
+    // Get the flashlight state from gameState
+    const flashlightOn = window.gameState ? window.gameState.flashlightOn : true;
+    
+    // Set the intensity based on the flashlight state
+    const targetIntensity = flashlightOn ? 75 : 0;
+    const targetGlowIntensity = flashlightOn ? 2.25 : 0;
+    
+    // Apply intensities
+    flashlight.light.intensity = targetIntensity;
+    flashlight.glow.intensity = targetGlowIntensity;
 }
 
 function createRain(scene) {
