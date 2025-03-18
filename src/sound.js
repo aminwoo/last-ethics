@@ -108,6 +108,14 @@ const SOUNDS = {
     loopStart: 0.0,
     crossfadeDuration: 0.5
   },
+  
+  // UI Sounds
+  CLICK: {
+    url: '/sounds/click.wav',
+    volume: 0.5,
+    category: SOUND_CATEGORIES.UI,
+    loop: false
+  },
 };
 
 // Storage for loaded sounds
@@ -419,6 +427,9 @@ const SoundManager = {
     return playSound('RAIN');
   },
   playThunder: () => playSound('THUNDER'),
+  
+  // UI sound shortcuts
+  playSound: (soundId, volume = 1.0) => playSound(soundId, { volume }),
 
   // Categories for volume control
   categories: SOUND_CATEGORIES

@@ -84,6 +84,9 @@ const gameState = {
     gameStartTime: 0,
     gameEndTime: 0,
     
+    // Flashlight state
+    flashlightOn: true, // Flashlight starts on
+    
     // Wave system properties
     currentWave: 0,
     waveInProgress: false,
@@ -118,6 +121,7 @@ export function initializeGameState() {
     gameState.zombiesKilled.BRUTE = 0;
     gameState.gameStartTime = Date.now();
     gameState.gameEndTime = 0;
+    gameState.flashlightOn = true; // Ensure flashlight starts on
     
     // Reset wave properties
     gameState.currentWave = 0;
@@ -371,6 +375,12 @@ export function getWaveInfo() {
         waveInProgress: gameState.waveInProgress,
         nextWaveCountdown: Math.ceil(gameState.nextWaveCountdown)
     };
+}
+
+// Toggle flashlight on/off
+export function toggleFlashlight() {
+    gameState.flashlightOn = !gameState.flashlightOn;
+    return gameState.flashlightOn;
 }
 
 // Export the game state and functions
