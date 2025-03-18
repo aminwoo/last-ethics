@@ -8,7 +8,6 @@ import {
     reloadWeapon, 
     initializeGameState,
     getWaveInfo,
-    toggleFlashlight
 } from './gameState.js';
 import { initializeUI, updateUI, updateCrosshair, initializeMinimap, updateMinimap } from './ui.js';
 import { initializeInput, setupKeyboardListeners, setupMouseListeners, setupResizeListener } from './input.js';
@@ -19,8 +18,10 @@ import {
 import {
     createEnvironment,
     updateRain,
-    updateFlashlight
 } from './environment.js';
+import { 
+    updateFlashlight
+} from './effects.js';
 import { 
     handleWeaponSwitch,
     handleReload,
@@ -321,8 +322,9 @@ async function initializeGame() {
         onFlashlightToggle: () => {
             // Only allow flashlight toggle if not typing in chat
             if (!chat || !chat.isTyping()) {
-                toggleFlashlight();
                 // Play a click sound for feedback
+                player.userData.flashlightOn = !player.userData.flashlightOn;
+                sendPlayerUpdate(player); 
                 SoundManager.playSound('CLICK', 0.3);
             }
         }
@@ -591,11 +593,15 @@ function updatePlayerAndFlashlight(deltaTime) {
     if (shouldSendUpdate) {
         // For normal position updates, explicitly set isFiring to false
         // Weapon firing updates are sent separately in handleShooting
-        sendPlayerUpdate(player, false, gameState.weapon ? gameState.weapon.name : null);
+        sendPlayerUpdate(
+            player, 
+            false, 
+            gameState.weapon ? gameState.weapon.name : null,
+        );
     }
     
     // Update flashlight
-    updateFlashlight(environment.flashlight, player.position, direction);
+    updateFlashlight(environment.flashlight, player, direction);
     
     // Update camera position to follow player
     camera.position.x = player.position.x;

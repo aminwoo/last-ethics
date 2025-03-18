@@ -3,17 +3,14 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 
-// Initialize express app
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Serve static files (client game) from the public directory
 app.use(express.static(path.join(__dirname, '../')));
 
-// Create HTTP server
 const server = http.createServer(app);
 
-// Initialize WebSocket server
 const wss = new WebSocket.Server({ server });
 
 // Store connected clients with their IDs
@@ -57,12 +54,12 @@ wss.on('connection', (ws, req) => {
         ip: ip, // Store the IP for debugging
         name: `Player ${playerId}`, // Default name
         isFiring: false,
-        weaponType: null
+        weaponType: null,
+        flashlightOn: true
     });
     
     console.log(`Player ${playerId} connected. Total players: ${clients.size}`);
     
-    // Send the player their ID
     ws.send(JSON.stringify({
         type: 'init',
         id: playerId,
@@ -74,11 +71,11 @@ wss.on('connection', (ws, req) => {
                 rotation: p.rotation,
                 name: p.name || `Player ${p.id}`,
                 isFiring: p.isFiring || false,
-                weaponType: p.weaponType || null
-            })) // Only send players who have real positions and only send necessary data
+                weaponType: p.weaponType || null,
+                flashlightOn: p.flashlightOn
+            }))
     }));
     
-    // System message for player join
     broadcast({
         type: 'chat',
         playerId: 'system',
@@ -102,16 +99,7 @@ wss.on('connection', (ws, req) => {
                         if (player) {
                             // First real position update - announce the player to others
                             const isFirstUpdate = player.isInitializing;
-                            
-                            // Log first position update or every ~100 updates
-                            if (isFirstUpdate || Math.random() < 0.01) {
-                                console.log(`Player ${playerId} position update:`, 
-                                    `x:${data.position.x.toFixed(2)}, ` +
-                                    `y:${data.position.y.toFixed(2)}, ` +
-                                    `z:${data.position.z.toFixed(2)}`
-                                );
-                            }
-                            
+                                                        
                             // Update player data
                             player.position = data.position;
                             player.rotation = data.rotation;
@@ -120,17 +108,14 @@ wss.on('connection', (ws, req) => {
                             player.isFiring = data.isFiring || false;
                             player.weaponType = data.weaponType || null;
                             
-                            // If player is firing, log it
-                            if (player.isFiring) {
-                                console.log(`Player ${playerId} firing weapon: ${player.weaponType}`);
-                            }
+                            // Handle flashlight status 
+                            player.flashlightOn = data.flashlightOn;
+                        
                             
                             if (isFirstUpdate) {
                                 // Remove initializing flag
                                 player.isInitializing = false;
-                                
-                                console.log(`Player ${playerId} sent first position, announcing to others`);
-                                
+                                 
                                 // Now that we have real position, broadcast that a new player has joined
                                 broadcastToOthers(ws, {
                                     type: 'playerJoined',
@@ -163,8 +148,6 @@ wss.on('connection', (ws, req) => {
                             .slice(0, 200) // Limit message length
                             .replace(/</g, '&lt;')
                             .replace(/>/g, '&gt;');
-                        
-                        console.log(`Chat message from ${playerName}: ${sanitizedMessage}`);
                         
                         // Broadcast chat message to all clients
                         broadcast({
@@ -201,7 +184,7 @@ wss.on('connection', (ws, req) => {
                         }
                     }
                     break;
-                
+                    
                 // Handle player death
                 case 'playerDeath':
                     const player = players.get(playerId);

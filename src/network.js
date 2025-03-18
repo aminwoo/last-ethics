@@ -255,7 +255,6 @@ function initializeNetworking(playerUpdatedCallback, scene) {
                 setTimeout(() => {
                     const playerObject = scene.getObjectByName('player');
                     if (playerObject) {
-                        console.log('Sending initial position update');
                         sendPlayerUpdate(playerObject);
                     } else {
                         console.warn('Could not find player object for initial position update');
@@ -378,7 +377,6 @@ function handleServerMessage(messageData, scene) {
                 break;
                 
             case 'playerUpdate':
-                // Make sure we don't update ourselves
                 if (message.player.id === playerId) {
                     return;
                 }
@@ -431,8 +429,17 @@ function addRemotePlayer(playerData, scene) {
     const nameTag = createPlayerNameTag(playerData.id, playerData.name, false);
     remotePlayer.add(nameTag);
 
+    // Set the flashlight state in userData
+    // Initialize with same value to avoid triggering sound on first update
+    const initialFlashlightState = playerData.flashlightOn !== false; // Default to true if undefined
+    remotePlayer.userData.flashlightOn = initialFlashlightState;
+
     // Create flashlight for the remote player
     const flashlight = createRemotePlayerFlashlight(remotePlayer, scene);
+    
+    // Initialize flashlight visibility based on player data
+    flashlight.light.visible = initialFlashlightState;
+    flashlight.glow.visible = initialFlashlightState;
     
     // Store the flashlight with the player
     remotePlayer.userData.flashlight = flashlight;
@@ -446,6 +453,28 @@ function addRemotePlayer(playerData, scene) {
     
     console.log(`Remote player ${playerData.id} added to scene at position:`, remotePlayer.position);
     console.log(`Current remote players: ${remotePlayers.size}`);
+}
+
+/**
+ * Plays a spatially-aware flashlight toggle sound for a remote player
+ * @param {THREE.Vector3} playerPosition - Position of the remote player
+ */
+function playRemoteFlashlightToggleSound(playerPosition) {
+    // Get local player position for distance calculation
+    const localPlayer = window.gameScene?.getObjectByName('player');
+    if (!localPlayer) return;
+    
+    // Calculate distance between local and remote player
+    const distance = localPlayer.position.distanceTo(playerPosition);
+    const maxDistance = 30; // Maximum distance at which sound is audible
+    
+    if (distance > maxDistance) return; // Too far away to hear
+    
+    // Calculate volume based on distance (closer = louder)
+    const volume = Math.max(0.1, 0.8 * (1 - distance / maxDistance));
+    
+    // Play the sound
+    SoundManager.playSound('CLICK', volume);
 }
 
 /**
@@ -475,18 +504,33 @@ function updateRemotePlayerTransform(playerObject, playerData) {
         );
     }
     
+    // Store previous flashlight state to detect changes
+    const prevFlashlightState = playerObject.userData.flashlightOn;
+    
+    // Update the flashlight state if provided
+    if (playerData.hasOwnProperty('flashlightOn')) {
+        playerObject.userData.flashlightOn = playerData.flashlightOn;
+        
+        // Play flashlight toggle sound if the state has changed
+        if (prevFlashlightState !== playerData.flashlightOn) {
+            playRemoteFlashlightToggleSound(playerObject.position);
+        }
+    }
+    
     // Update the player's flashlight if it exists
     if (playerObject.userData.flashlight) {
+        // Update flashlight position and direction
         updateRemotePlayerFlashlight(
             playerObject.userData.flashlight,
             playerObject.position,
             playerObject.rotation
         );
+        
+        // Show or hide the flashlight based on the player's flashlight state
+        const isFlashlightOn = playerObject.userData.flashlightOn !== false; // Default to true if undefined
+        playerObject.userData.flashlight.light.visible = isFlashlightOn;
+        playerObject.userData.flashlight.glow.visible = isFlashlightOn;
     }
-    
-    // Track whether player was previously firing
-    const wasFiring = playerObject.userData.isFiring === true;
-    const weaponType = playerObject.userData.weaponType;
     
     // Update firing state
     playerObject.userData.isFiring = playerData.isFiring;
@@ -498,7 +542,7 @@ function updateRemotePlayerTransform(playerObject, playerData) {
         createRemotePlayerMuzzleFlash(playerObject, playerData.weaponType);
         
         // Play appropriate weapon sound
-        playRemotePlayerWeaponSound(playerData.weaponType, playerData.id);
+        playRemotePlayerWeaponSound(playerData.weaponType, playerData.id, playerData.position);
     } 
 
     // Check if player is moving by comparing positions
@@ -597,8 +641,9 @@ function sendPlayerUpdate(playerObject, isFiring = false, weaponType = null) {
             z: playerObject.rotation.z
         },
         isFiring: isFiring,
-        weaponType: weaponType
-    };
+        weaponType: weaponType,
+        flashlightOn: playerObject.userData.flashlightOn
+    }
         
     socket.send(JSON.stringify(message));
 }
@@ -781,6 +826,8 @@ function updatePlayerNameTag(playerObject, newName) {
 function updateRemotePlayer(playerData) {
     const remotePlayer = remotePlayers.get(playerData.id);
     if (remotePlayer) {        
+        // Make sure playerData contains the flashlightOn property before updating
+        // This ensures we respect the remote player's flashlight state
         updateRemotePlayerTransform(remotePlayer, playerData);
     } else {
         console.warn(`Received update for unknown player ${playerData.id}, adding them now`);
@@ -1104,29 +1151,39 @@ function createRemotePlayerBullets(scene, playerObject, weaponType) {
  * Plays weapon sounds for remote players with distance-based volume
  * @param {string} weaponType - The type of weapon being fired
  * @param {string} playerId - The ID of the remote player
+ * @param {THREE.Vector3} playerPosition - Position of the remote player
  */
-function playRemotePlayerWeaponSound(weaponType, playerId) {
+function playRemotePlayerWeaponSound(weaponType, playerId, playerPosition) {
     if (!playerId) {
         console.warn('Missing player ID for remote weapon sound');
         return;
     }
     
-    // Play appropriate weapon sound at reduced volume for remote players
+    // Get local player position for distance calculation
+    const localPlayer = window.gameScene?.getObjectByName('player');
+    if (!localPlayer) return;
+    
+    // Calculate distance between local and remote player
+    const distance = localPlayer.position.distanceTo(playerPosition);
+    const maxDistance = 50; // Maximum distance at which weapon sounds are audible (farther than flashlight)
+    
+    if (distance > maxDistance) return; // Too far away to hear
+    
+    // Calculate volume based on distance (closer = louder)
+    // Weapon sounds should be louder than flashlight toggle sounds
+    const baseVolume = 0.8; // Base volume for weapons at short range
+    const volume = Math.max(0.15, baseVolume * (1 - distance / maxDistance));
+    
+    // Play appropriate weapon sound with distance-based volume
     switch(weaponType) {
         case 'Shotgun':
-            if (SoundManager.playShotgunShot) {
-                SoundManager.playShotgunShot(0.5); // 50% volume
-            }
+            SoundManager.playSound('SHOTGUN_SHOT', volume);
             break;
         case 'Sniper Rifle':
-            if (SoundManager.playRifleShot) {
-                SoundManager.playRifleShot(0.5);
-            }
+            SoundManager.playSound('RIFLE_SHOT', volume);
             break;
-        default: // Pistol or default
-            if (SoundManager.playPistolShot) {
-                SoundManager.playPistolShot(0.5);
-            }
+        default:
+            SoundManager.playSound('PISTOL_SHOT', volume);
     }
 }
 
@@ -1256,6 +1313,7 @@ function createPlayerDeathEffect(position, scene) {
         scene.remove(flash);
     }, 300);
 }
+
 
 // Export networking functions
 export {
