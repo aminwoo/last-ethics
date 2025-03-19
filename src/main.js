@@ -10,7 +10,12 @@ import {
     getWaveInfo,
 } from './gameState.js';
 import { initializeUI, updateUI, updateCrosshair, initializeMinimap, updateMinimap } from './ui.js';
-import { initializeInput, setupKeyboardListeners, setupMouseListeners, setupResizeListener } from './input.js';
+import { 
+    initializeInput, 
+    setupKeyboardListeners, 
+    setupMouseListeners, 
+    setupResizeListener,
+} from './input.js';
 import { 
     initializePlayer, 
     updatePlayerMovement
@@ -43,15 +48,15 @@ import {
 import { 
     initializeNetworking, 
     sendPlayerUpdate, 
-    getRemotePlayerCount, 
     getRemotePlayers, 
     cleanupNetworking, 
     updateNetworking, 
     setPlayerName,
-    createPlayerNameTag
 } from './network.js';
 // Import chat functionality
 import { initializeChat } from './chat.js';
+// Import inventory functionality
+import { initializeInventory, toggleInventory } from './inventory.js';
 
 // DOM elements
 const welcomeScreen = document.getElementById('welcome-screen');
@@ -84,7 +89,7 @@ document.addEventListener('waveStart', handleWaveStart);
 
 // Variables to store initialized game objects
 let ui, input, scene, camera, renderer, raycaster, groundPlane, 
-    groundIntersectPoint, environment, player, chat;
+    groundIntersectPoint, environment, player, chat, inventory;
 
 // Add a multiplayer status element to the UI
 let multiplayerStatusElement = null;
@@ -234,16 +239,56 @@ async function startGame() {
 
 // Full game initialization and start
 async function initializeGame() {
-    // Initialize game state
+    // Reset and initialize game state
     initializeGameState();
     
     // Initialize UI
     ui = initializeUI();
+    
     // Initialize minimap
     initializeMinimap(ui);
-
+    
     // Initialize input
     input = initializeInput();
+    
+    // Make three.js resources available globally for inventory system
+    window.renderer = renderer;
+    window.scene = scene;
+    window.camera = camera;
+    
+    // Initialize inventory system
+    inventory = initializeInventory();
+    
+    // Setup keyboard listeners
+    setupKeyboardListeners(input, {
+        onReload: () => {
+            // Only allow reloading if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                handleReload(player, reloadWeapon, gameState);
+            }
+        },
+        onFlashlightToggle: () => {
+            // Only allow flashlight toggle if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                // Play a click sound for feedback
+                player.userData.flashlightOn = !player.userData.flashlightOn;
+                sendPlayerUpdate(player); 
+                SoundManager.playSound('CLICK', 0.3);
+            }
+        },
+        onWeaponSwitch: (weaponIndex) => {
+            // Only allow weapon switching if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState);
+            }
+        },
+        onInventoryToggle: () => {
+            // Only allow inventory toggle if not typing in chat
+            if (!chat || !chat.isTyping()) {
+                toggleInventory(inventory, input);
+            }
+        }
+    });
 
     // Create environment
     environment = createEnvironment(scene, camera);
@@ -302,31 +347,6 @@ async function initializeGame() {
         },
         onMouseUp: () => {
 
-        }
-    });
-
-    // Set up keyboard listeners for weapon switching and reloading
-    setupKeyboardListeners(input, {
-        onReload: () => {
-            // Only allow reloading if not typing in chat
-            if (!chat || !chat.isTyping()) {
-                handleReload(player, reloadWeapon, gameState);
-            }
-        },
-        onWeaponSwitch: (weaponIndex) => {
-            // Only allow weapon switching if not typing in chat
-            if (!chat || !chat.isTyping()) {
-                handleWeaponSwitch(player, weaponIndex, switchWeapon, gameState);
-            }
-        },
-        onFlashlightToggle: () => {
-            // Only allow flashlight toggle if not typing in chat
-            if (!chat || !chat.isTyping()) {
-                // Play a click sound for feedback
-                player.userData.flashlightOn = !player.userData.flashlightOn;
-                sendPlayerUpdate(player); 
-                SoundManager.playSound('CLICK', 0.3);
-            }
         }
     });
 
@@ -476,15 +496,19 @@ function handleWaveStart(event) {
 
 // Update the animate function to include time delta for animations
 let lastTime = 0;
+let animationFrameId = null;
 
 function animate(time) {
     const deltaTime = (lastTime === 0) ? 0 : Math.min(0.05, (time - lastTime) / 1000);
     lastTime = time;
     
-    // Increment frame count
-    gameState.frameCount++;
+    // Check if inventory is open - reduce update frequency for better performance
+    const inventoryIsOpen = inventory && inventory.isOpen;
+    
+    // Always increment game time
     gameState.gameTime += deltaTime;
-
+    gameState.frameCount++;
+    
     // Check if game is over
     if (gameState.health <= 0 && !gameState.gameOver) {
         handleGameOver();
@@ -496,70 +520,67 @@ function animate(time) {
         return;
     }
     
-    // Update game state
+    // Update game state regardless of inventory state
     updateGameState(deltaTime, input.keys);
     
-    // Handle automatic weapon firing if mouse is held down
-    if (input.mouseDown && gameState.weapon && gameState.weapon.isAutomatic) {
+    // Handle automatic weapon firing if mouse is held down (only if inventory is closed)
+    if (!inventoryIsOpen && input.mouseDown && gameState.weapon && gameState.weapon.isAutomatic) {
         // Only attempt to fire if not typing in chat
         if (!chat || !chat.isTyping()) {
             handleShooting(input, player, scene, gameState);
         }
     }
     
-    // Update player movement and direction
-    const direction = updatePlayerAndFlashlight(deltaTime);
+    // Update player movement and direction (with potential movement restrictions if inventory is open)
+    const direction = updatePlayerAndFlashlight(deltaTime, inventoryIsOpen);
     
-    // Update bullets
-    updateBullets(scene, ZombieSystem.getZombies());
+    // If inventory is open, update game systems at a reduced rate to improve performance
+    const shouldUpdateFullFrame = !inventoryIsOpen || (gameState.frameCount % 3 === 0);
     
-    // Update screen shake
-    updateScreenShake(camera);
-    
-    // Update zombies
-    ZombieSystem.updateZombies(deltaTime);
-    
-    // Update turrets to target and shoot zombies
-    updateTurrets(deltaTime, scene, ZombieSystem.getZombies());
-    
-    // Periodically cleanup dead zombies
-    if (gameState.frameCount % 120 === 0) {
-        ZombieSystem.cleanupDeadZombies(scene);
-    }
-    
-    // Apply screen shake effect if enabled
-    if (gameState.screenShake > 0) {
-        // Apply screen shake
-        const shakeIntensity = gameState.screenShake;
-        camera.position.x += (Math.random() - 0.5) * shakeIntensity * 0.1;
-        camera.position.y += (Math.random() - 0.5) * shakeIntensity * 0.1;
-        camera.position.z += (Math.random() - 0.5) * shakeIntensity * 0.1;
+    if (shouldUpdateFullFrame) {
+        // Update core game systems at reduced frequency when inventory is open
+        updateBullets(scene, ZombieSystem.getZombies());
+        updateScreenShake(camera);
+        ZombieSystem.updateZombies(deltaTime);
+        updateTurrets(deltaTime, scene, ZombieSystem.getZombies());
         
-        // Decay screen shake
-        gameState.screenShake *= 0.9;
-        if (gameState.screenShake < 0.01) {
-            gameState.screenShake = 0;
+        // Periodically cleanup dead zombies
+        if (gameState.frameCount % 120 === 0) {
+            ZombieSystem.cleanupDeadZombies(scene);
         }
+        
+        // Apply screen shake effect if enabled
+        if (gameState.screenShake > 0) {
+            // Apply screen shake
+            const shakeIntensity = gameState.screenShake;
+            camera.position.x += (Math.random() - 0.5) * shakeIntensity * 0.1;
+            camera.position.y += (Math.random() - 0.5) * shakeIntensity * 0.1;
+            camera.position.z += (Math.random() - 0.5) * shakeIntensity * 0.1;
+            
+            // Decay screen shake
+            gameState.screenShake *= 0.9;
+            if (gameState.screenShake < 0.01) {
+                gameState.screenShake = 0;
+            }
+        }
+        
+        // Always update UI elements
+        updateUI(ui, gameState);
+        updateWaveUI();
+        
+        // Update minimap less frequently when inventory is open
+        if (direction) {
+            updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
+        }
+        
+        // Update networking (update other players, send position updates)
+        updateNetworking();
+        
+        // Update rain if active
+        updateRain(environment.rainParticles, player.position);
     }
     
-    // Update UI elements
-    updateUI(ui, gameState);
-    
-    // Update wave UI
-    updateWaveUI();
-    
-    // Update minimap
-    if (direction) {
-        updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
-    }
-    
-    // Update networking (update other players, send position updates)
-    updateNetworking();
-    
-    // Update rain if active
-    updateRain(environment.rainParticles, player.position);
-    
-    // Always render even when not focused (shows last frame)
+    // Always render the scene
     renderer.render(scene, camera);
     
     // Update labels renderer
@@ -567,9 +588,10 @@ function animate(time) {
 }
 
 // Update the updatePlayerAndFlashlight function to send position updates to the server
-function updatePlayerAndFlashlight(deltaTime) {
-    // Don't update movement if typing in chat
+function updatePlayerAndFlashlight(deltaTime, inventoryIsOpen) {
+    // Don't update movement if typing in chat or inventory is open
     const isTypingInChat = chat && chat.isTyping();
+    const shouldUpdateMovement = !isTypingInChat && !inventoryIsOpen;
     
     // Update player movement and get direction
     const direction = updatePlayerMovement(
@@ -581,7 +603,7 @@ function updatePlayerAndFlashlight(deltaTime) {
         groundPlane, 
         groundIntersectPoint, 
         { camera },
-        isTypingInChat // Pass typing state to prevent movement while typing
+        !shouldUpdateMovement // Skip movement if typing in chat or inventory is open
     );
     
     // Send player position update to server

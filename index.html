@@ -73,6 +73,7 @@
 				<p>R - Reload</p>
 				<p>F - Toggle Flashlight</p>
 				<p>1-4 - Change Weapon</p>
+				<p>I - Inventory</p>
 			</div>
 			<div id="status-panel">
 				<div class="status-container">
@@ -119,6 +120,51 @@
 			</div>
 			
 			<div id="crosshair"></div>
+			
+			<!-- Inventory Overlay -->
+			<div id="inventory-overlay">
+				<div class="inventory-content">
+					<div class="inventory-title">INVENTORY</div>
+					<div class="inventory-details">
+						<div id="item-preview"></div>
+						<div id="item-info">
+							<div id="item-name">No item selected</div>
+							<div id="item-description">Select an item to view details</div>
+						</div>
+					</div>
+					<div class="inventory-container">
+						<div class="inventory-grid">
+							<!-- 2 rows x 10 columns of inventory slots -->
+							<div class="inventory-row">
+								<!-- First row of slots -->
+								<div class="inventory-slot" data-slot="0"></div>
+								<div class="inventory-slot" data-slot="1"></div>
+								<div class="inventory-slot" data-slot="2"></div>
+								<div class="inventory-slot" data-slot="3"></div>
+								<div class="inventory-slot" data-slot="4"></div>
+								<div class="inventory-slot" data-slot="5"></div>
+								<div class="inventory-slot" data-slot="6"></div>
+								<div class="inventory-slot" data-slot="7"></div>
+								<div class="inventory-slot" data-slot="8"></div>
+								<div class="inventory-slot" data-slot="9"></div>
+							</div>
+							<div class="inventory-row">
+								<!-- Second row of slots -->
+								<div class="inventory-slot" data-slot="10"></div>
+								<div class="inventory-slot" data-slot="11"></div>
+								<div class="inventory-slot" data-slot="12"></div>
+								<div class="inventory-slot" data-slot="13"></div>
+								<div class="inventory-slot" data-slot="14"></div>
+								<div class="inventory-slot" data-slot="15"></div>
+								<div class="inventory-slot" data-slot="16"></div>
+								<div class="inventory-slot" data-slot="17"></div>
+								<div class="inventory-slot" data-slot="18"></div>
+								<div class="inventory-slot" data-slot="19"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 		
 		<script type="module" src="/src/main.js"></script>
