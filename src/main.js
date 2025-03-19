@@ -218,11 +218,14 @@ async function startGame() {
             // Hide welcome screen
             welcomeScreen.style.display = 'none';
             
-            // Show UI
-            uiContainer.style.display = 'block';
-            
-            // Initialize and start the game
-            initializeGame();
+            // Show loading screen then initialize game
+            showLoadingScreen(() => {
+                // Show UI
+                uiContainer.style.display = 'block';
+                
+                // Initialize and start the game
+                initializeGame();
+            });
         }, 1000);
     } catch (error) {
         // Continue with the game even if audio fails
@@ -231,10 +234,73 @@ async function startGame() {
         
         setTimeout(() => {
             welcomeScreen.style.display = 'none';
-            uiContainer.style.display = 'block';
-            initializeGame();
+            
+            // Show loading screen then initialize game
+            showLoadingScreen(() => {
+                // Show UI
+                uiContainer.style.display = 'block';
+                
+                // Initialize and start the game
+                initializeGame();
+            });
         }, 1000);
     }
+}
+
+// Function to display loading screen with progress bar
+function showLoadingScreen(onComplete) {
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingBar = document.getElementById('loading-bar');
+    const loadingText = document.getElementById('loading-text');
+    loadingScreen.style.display = 'flex';
+    loadingScreen.style.opacity = '1';
+    
+    // Simulate loading progress
+    let progress = 0;
+    const loadingMessages = [
+        "PREPARING YOUR ARSENAL...",
+        "CHARGING FLASHLIGHT BATTERIES...",
+        "SPAWNING ZOMBIES...",
+        "LOADING AMMUNITION...",
+        "SECURING THE PERIMETER...",
+        "CHECKING SURVIVAL PROTOCOLS..."
+    ];
+    
+    const loadingInterval = setInterval(() => {
+        progress += Math.random() * 10;
+        if (progress > 100) progress = 100;
+        
+        loadingBar.style.width = `${progress}%`;
+        
+        // Update loading message periodically
+        if (progress < 90) {
+            const messageIndex = Math.floor((progress / 90) * loadingMessages.length);
+            loadingText.textContent = loadingMessages[messageIndex];
+        } else {
+            loadingText.textContent = "HERE COME THE HORDE!";
+        }
+        
+        // When loading is complete
+        if (progress === 100) {
+            clearInterval(loadingInterval);
+            
+            // Delay for a moment at 100% to show "READY TO DEPLOY!"
+            setTimeout(() => {
+                // Hide loading screen with a fade
+                loadingScreen.style.opacity = '0';
+                loadingScreen.style.transition = 'opacity 0.5s ease-out';
+                
+                // Wait for fade to complete
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    // Call the completion callback
+                    if (typeof onComplete === 'function') {
+                        onComplete();
+                    }
+                }, 500);
+            }, 800);
+        }
+    }, 200);
 }
 
 // Full game initialization and start
@@ -533,52 +599,47 @@ function animate(time) {
     
     // Update player movement and direction (with potential movement restrictions if inventory is open)
     const direction = updatePlayerAndFlashlight(deltaTime, inventoryIsOpen);
+
+    // Update core game systems at reduced frequency when inventory is open
+    updateBullets(scene, ZombieSystem.getZombies());
+    updateScreenShake(camera);
+    ZombieSystem.updateZombies(deltaTime);
+    updateTurrets(deltaTime, scene, ZombieSystem.getZombies());
     
-    // If inventory is open, update game systems at a reduced rate to improve performance
-    const shouldUpdateFullFrame = !inventoryIsOpen || (gameState.frameCount % 3 === 0);
-    
-    if (shouldUpdateFullFrame) {
-        // Update core game systems at reduced frequency when inventory is open
-        updateBullets(scene, ZombieSystem.getZombies());
-        updateScreenShake(camera);
-        ZombieSystem.updateZombies(deltaTime);
-        updateTurrets(deltaTime, scene, ZombieSystem.getZombies());
-        
-        // Periodically cleanup dead zombies
-        if (gameState.frameCount % 120 === 0) {
-            ZombieSystem.cleanupDeadZombies(scene);
-        }
-        
-        // Apply screen shake effect if enabled
-        if (gameState.screenShake > 0) {
-            // Apply screen shake
-            const shakeIntensity = gameState.screenShake;
-            camera.position.x += (Math.random() - 0.5) * shakeIntensity * 0.1;
-            camera.position.y += (Math.random() - 0.5) * shakeIntensity * 0.1;
-            camera.position.z += (Math.random() - 0.5) * shakeIntensity * 0.1;
-            
-            // Decay screen shake
-            gameState.screenShake *= 0.9;
-            if (gameState.screenShake < 0.01) {
-                gameState.screenShake = 0;
-            }
-        }
-        
-        // Always update UI elements
-        updateUI(ui, gameState);
-        updateWaveUI();
-        
-        // Update minimap less frequently when inventory is open
-        if (direction) {
-            updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
-        }
-        
-        // Update networking (update other players, send position updates)
-        updateNetworking();
-        
-        // Update rain if active
-        updateRain(environment.rainParticles, player.position);
+    // Periodically cleanup dead zombies
+    if (gameState.frameCount % 120 === 0) {
+        ZombieSystem.cleanupDeadZombies(scene);
     }
+    
+    // Apply screen shake effect if enabled
+    if (gameState.screenShake > 0) {
+        // Apply screen shake
+        const shakeIntensity = gameState.screenShake;
+        camera.position.x += (Math.random() - 0.5) * shakeIntensity * 0.1;
+        camera.position.y += (Math.random() - 0.5) * shakeIntensity * 0.1;
+        camera.position.z += (Math.random() - 0.5) * shakeIntensity * 0.1;
+        
+        // Decay screen shake
+        gameState.screenShake *= 0.9;
+        if (gameState.screenShake < 0.01) {
+            gameState.screenShake = 0;
+        }
+    }
+    
+    // Always update UI elements
+    updateUI(ui, gameState);
+    updateWaveUI();
+    
+    // Update minimap less frequently when inventory is open
+    if (direction) {
+        updateMinimap(ui, player.position, direction, window.environmentObstacles, ZombieSystem.getZombies(), getRemotePlayers());
+    }
+    
+    // Update networking (update other players, send position updates)
+    updateNetworking();
+    
+    // Update rain if active
+    updateRain(environment.rainParticles, player.position);
     
     // Always render the scene
     renderer.render(scene, camera);
