@@ -1,183 +1,448 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8">
-		<title>Zombie Top-Down Shooter</title>
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
-		<link rel="stylesheet" href="/css/game-ui.css">
-	</head>
-	<body>
-		<div id="gameContainer"></div>
-		
-		<div id="welcome-screen">
-			<div class="welcome-content">
-				<h1>LAST ETHICS</h1>
-				<h2>Zombie Apocalypse</h2>
-				
-				<div class="welcome-form">
-					<div class="input-group">
-						<label for="username">SURVIVOR NAME</label>
-						<input type="text" id="username" placeholder="Enter your name" maxlength="15" autofocus>
-					</div>
-					
-					<button id="join-game-btn">JOIN THE FIGHT</button>
-				</div>
-				
-				<div class="game-description">
-					<p>The world has fallen. You are humanity's last hope.</p>
-					<p>Survive. Fight. Prevail.</p>
-				</div>
-			</div>
-		</div>
-		
-		<!-- Loading Screen -->
-		<div id="loading-screen" style="display: none;">
-			<div class="loading-content">
-				<h1>LOADING</h1>
-				<div class="loading-bar-container">
-					<div id="loading-bar"></div>
-				</div>
-				<div id="loading-text">PREPARING YOUR ARSENAL...</div>
-			</div>
-		</div>
-		
-		<!-- Game Over Screen -->
-		<div id="game-over-screen" style="display: none;">
-			<div class="game-over-content">
-				<h1>GAME OVER</h1>
-				<h2>You have fallen</h2>
-				
-				<div class="stats-container">
-					<div class="stat-item">
-						<div class="stat-label">SCORE</div>
-						<div id="final-score" class="stat-value">0</div>
-					</div>
-					<div class="stat-item">
-						<div class="stat-label">ZOMBIES KILLED</div>
-						<div id="final-kills" class="stat-value">0</div>
-					</div>
-					<div class="stat-item">
-						<div class="stat-label">HIGHEST WAVE</div>
-						<div id="final-wave" class="stat-value">0</div>
-					</div>
-					<div class="stat-item">
-						<div class="stat-label">SURVIVAL TIME</div>
-						<div id="survival-time" class="stat-value">0:00</div>
-					</div>
-				</div>
-				
-				<button id="restart-game-btn">TRY AGAIN</button>
-			</div>
-		</div>
-		
-		<div id="ui-container">
-			<!-- Damage flash overlay -->
-			<div id="damage-flash"></div>
-			
-			<div id="instructions">
-				<h3>Last Ethics</h3>
-				<p>WASD - Move</p>
-				<p>Shift - Sprint</p>
-				<p>Left Click - Shoot</p>
-				<p>R - Reload</p>
-				<p>F - Toggle Flashlight</p>
-				<p>1-4 - Change Weapon</p>
-				<p>I - Inventory</p>
-			</div>
-			<div id="status-panel">
-				<div class="status-container">
-					<div class="status-label">HEALTH</div>
-					<div class="bar-container">
-						<div id="health-bar" class="bar"></div>
-						<div id="health-text">100%</div>
-					</div>
-				</div>
-				
-				<div class="status-container">
-					<div class="status-label">STAMINA</div>
-					<div class="bar-container stamina-bar-container">
-						<div id="stamina-bar" class="bar"></div>
-					</div>
-				</div>
-				
-				<div class="status-container weapon-container">
-					<div class="status-label">WEAPON</div>
-					<div id="weapon-display">
-						<div id="weapon-image-container">
-							<img id="weapon-image" src="/images/GUN_01_[square_frame]_01_V1.00.png" alt="Current Weapon">
-						</div>
-						<div id="weapon-info">
-							<div id="weapon-name">Pistol</div>
-							<div id="ammo-counter">12 / 48</div>
-						</div>
-					</div>
-				</div>
-			</div>
-			
-			<div id="score-panel">
-				<div id="score-display" class="score-text">Score: 0</div>
-				<div id="kill-counter" class="score-text">Kills: 0 (R:0 | S:0 | B:0)</div>
-			</div>
-			
-			<div id="minimap-container">
-				<div class="status-label">MINIMAP</div>
-				<div id="minimap">
-					<canvas id="minimap-canvas"></canvas>
-					<div id="pulse-ring"></div>
-					<div id="player-indicator"></div>
-				</div>
-			</div>
-			
-			<div id="crosshair"></div>
-			
-			<!-- Inventory Overlay -->
-			<div id="inventory-overlay">
-				<div class="inventory-content">
-					<div class="inventory-title">INVENTORY</div>
-					<div class="inventory-details">
-						<div id="item-preview"></div>
-						<div id="item-info">
-							<div id="item-name">No item selected</div>
-							<div id="item-description">Select an item to view details</div>
-						</div>
-					</div>
-					<div class="inventory-container">
-						<div class="inventory-grid">
-							<!-- 2 rows x 10 columns of inventory slots -->
-							<div class="inventory-row">
-								<!-- First row of slots -->
-								<div class="inventory-slot" data-slot="0"></div>
-								<div class="inventory-slot" data-slot="1"></div>
-								<div class="inventory-slot" data-slot="2"></div>
-								<div class="inventory-slot" data-slot="3"></div>
-								<div class="inventory-slot" data-slot="4"></div>
-								<div class="inventory-slot" data-slot="5"></div>
-								<div class="inventory-slot" data-slot="6"></div>
-								<div class="inventory-slot" data-slot="7"></div>
-								<div class="inventory-slot" data-slot="8"></div>
-								<div class="inventory-slot" data-slot="9"></div>
-							</div>
-							<div class="inventory-row">
-								<!-- Second row of slots -->
-								<div class="inventory-slot" data-slot="10"></div>
-								<div class="inventory-slot" data-slot="11"></div>
-								<div class="inventory-slot" data-slot="12"></div>
-								<div class="inventory-slot" data-slot="13"></div>
-								<div class="inventory-slot" data-slot="14"></div>
-								<div class="inventory-slot" data-slot="15"></div>
-								<div class="inventory-slot" data-slot="16"></div>
-								<div class="inventory-slot" data-slot="17"></div>
-								<div class="inventory-slot" data-slot="18"></div>
-								<div class="inventory-slot" data-slot="19"></div>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		
-		<script type="module" src="/src/main.js"></script>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>Zombie Top-Down Shooter</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Exo+2:wght@300;400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/game-ui.css" />
+  </head>
+  <body>
+    <div id="gameContainer"></div>
+
+    <div id="welcome-screen">
+      <div class="welcome-content">
+        <h1>LAST ETHICS</h1>
+        <h2>Zombie Apocalypse</h2>
+
+        <div class="welcome-form">
+          <div class="input-group">
+            <label for="username">SURVIVOR NAME</label>
+            <input
+              type="text"
+              id="username"
+              placeholder="Enter your name"
+              maxlength="15"
+              autofocus
+            />
+          </div>
+
+          <button id="join-game-btn">JOIN THE FIGHT</button>
+        </div>
+
+        <div class="game-description">
+          <p>The world has fallen. You are humanity's last hope.</p>
+          <p>Survive. Fight. Prevail.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Class Selection Screen -->
+    <div id="class-selection-screen" style="display: none">
+      <div class="class-selection-content">
+        <h1>CHOOSE YOUR CLASS</h1>
+        <h2 id="player-name-display">Survivor</h2>
+
+        <div class="class-grid">
+          <div class="class-card" data-class="soldier">
+            <div class="class-icon">🎖️</div>
+            <div class="class-name">Soldier</div>
+            <div class="class-description">
+              Balanced warrior with extra damage
+            </div>
+            <div class="class-stats">
+              <div class="stat-row">
+                <span>Health</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 66%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Speed</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 66%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Damage</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 76%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Stamina</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 66%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="class-abilities">
+              <div class="ability">+15% weapon damage</div>
+            </div>
+          </div>
+
+          <div class="class-card" data-class="medic">
+            <div class="class-icon">💉</div>
+            <div class="class-name">Medic</div>
+            <div class="class-description">
+              Field medic with enhanced survival
+            </div>
+            <div class="class-stats">
+              <div class="stat-row">
+                <span>Health</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 80%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Speed</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 63%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Damage</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 60%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Stamina</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 60%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="class-abilities">
+              <div class="ability">+2 HP regeneration/sec</div>
+              <div class="ability">+20% max health</div>
+            </div>
+          </div>
+
+          <div class="class-card" data-class="scout">
+            <div class="class-icon">🏃</div>
+            <div class="class-name">Scout</div>
+            <div class="class-description">
+              Swift recon with superior agility
+            </div>
+            <div class="class-stats">
+              <div class="stat-row">
+                <span>Health</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 53%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Speed</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 83%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Damage</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 63%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Stamina</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 100%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="class-abilities">
+              <div class="ability">+25% movement speed</div>
+              <div class="ability">+50% max stamina</div>
+            </div>
+          </div>
+
+          <div class="class-card" data-class="heavy">
+            <div class="class-icon">🛡️</div>
+            <div class="class-name">Heavy</div>
+            <div class="class-description">Tank with massive health pool</div>
+            <div class="class-stats">
+              <div class="stat-row">
+                <span>Health</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 100%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Speed</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 53%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Damage</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 73%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Stamina</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 46%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="class-abilities">
+              <div class="ability">+50% max health</div>
+              <div class="ability">15% damage reduction</div>
+            </div>
+          </div>
+
+          <div class="class-card" data-class="assassin">
+            <div class="class-icon">🗡️</div>
+            <div class="class-name">Assassin</div>
+            <div class="class-description">
+              Deadly specialist with critical hits
+            </div>
+            <div class="class-stats">
+              <div class="stat-row">
+                <span>Health</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 50%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Speed</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 73%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Damage</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 66%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Stamina</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 80%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="class-abilities">
+              <div class="ability">20% critical hit chance</div>
+              <div class="ability">+30% reload speed</div>
+            </div>
+          </div>
+
+          <div class="class-card" data-class="engineer">
+            <div class="class-icon">🔧</div>
+            <div class="class-name">Engineer</div>
+            <div class="class-description">
+              Tactical expert with ammo efficiency
+            </div>
+            <div class="class-stats">
+              <div class="stat-row">
+                <span>Health</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 60%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Speed</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 63%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Damage</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 66%"></div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span>Stamina</span>
+                <div class="stat-bar">
+                  <div class="stat-fill" style="width: 66%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="class-abilities">
+              <div class="ability">15% ammo saver chance</div>
+              <div class="ability">+25% turret damage</div>
+            </div>
+          </div>
+        </div>
+
+        <button id="confirm-class-btn" disabled>SELECT A CLASS</button>
+      </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" style="display: none">
+      <div class="loading-content">
+        <h1>LOADING</h1>
+        <div class="loading-bar-container">
+          <div id="loading-bar"></div>
+        </div>
+        <div id="loading-text">PREPARING YOUR ARSENAL...</div>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" style="display: none">
+      <div class="game-over-content">
+        <h1>GAME OVER</h1>
+        <h2>You have fallen</h2>
+
+        <div class="final-class-display">
+          <span id="final-class-icon">🎖️</span>
+          <span id="final-class-name">Soldier</span>
+        </div>
+
+        <div class="stats-container">
+          <div class="stat-item">
+            <div class="stat-label">SCORE</div>
+            <div id="final-score" class="stat-value">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">ZOMBIES KILLED</div>
+            <div id="final-kills" class="stat-value">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">HIGHEST WAVE</div>
+            <div id="final-wave" class="stat-value">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">SURVIVAL TIME</div>
+            <div id="survival-time" class="stat-value">0:00</div>
+          </div>
+        </div>
+
+        <button id="restart-game-btn">TRY AGAIN</button>
+      </div>
+    </div>
+
+    <div id="ui-container">
+      <!-- Damage flash overlay -->
+      <div id="damage-flash"></div>
+
+      <div id="instructions">
+        <h3>Last Ethics</h3>
+        <p>WASD - Move</p>
+        <p>Shift - Sprint</p>
+        <p>Left Click - Shoot</p>
+        <p>R - Reload</p>
+        <p>F - Toggle Flashlight</p>
+        <p>1-4 - Change Weapon</p>
+        <p>I - Inventory</p>
+      </div>
+      <div id="status-panel">
+        <div class="status-container class-indicator">
+          <div id="player-class-display">
+            <span id="class-icon">🎖️</span>
+            <span id="class-name-display">Soldier</span>
+          </div>
+        </div>
+
+        <div class="status-container">
+          <div class="status-label">HEALTH</div>
+          <div class="bar-container">
+            <div id="health-bar" class="bar"></div>
+            <div id="health-text">100%</div>
+          </div>
+        </div>
+
+        <div class="status-container">
+          <div class="status-label">STAMINA</div>
+          <div class="bar-container stamina-bar-container">
+            <div id="stamina-bar" class="bar"></div>
+          </div>
+        </div>
+
+        <div class="status-container weapon-container">
+          <div class="status-label">WEAPON</div>
+          <div id="weapon-display">
+            <div id="weapon-image-container">
+              <img
+                id="weapon-image"
+                src="/images/GUN_01_[square_frame]_01_V1.00.png"
+                alt="Current Weapon"
+              />
+            </div>
+            <div id="weapon-info">
+              <div id="weapon-name">Pistol</div>
+              <div id="ammo-counter">12 / 48</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="score-panel">
+        <div id="score-display" class="score-text">Score: 0</div>
+        <div id="kill-counter" class="score-text">
+          Kills: 0 (R:0 | S:0 | B:0)
+        </div>
+      </div>
+
+      <div id="minimap-container">
+        <div class="status-label">MINIMAP</div>
+        <div id="minimap">
+          <canvas id="minimap-canvas"></canvas>
+          <div id="pulse-ring"></div>
+          <div id="player-indicator"></div>
+        </div>
+      </div>
+
+      <div id="crosshair"></div>
+
+      <!-- Inventory Overlay -->
+      <div id="inventory-overlay">
+        <div class="inventory-content">
+          <div class="inventory-title">INVENTORY</div>
+          <div class="inventory-details">
+            <div id="item-preview"></div>
+            <div id="item-info">
+              <div id="item-name">No item selected</div>
+              <div id="item-description">Select an item to view details</div>
+            </div>
+          </div>
+          <div class="inventory-container">
+            <div class="inventory-grid">
+              <!-- 2 rows x 10 columns of inventory slots -->
+              <div class="inventory-row">
+                <!-- First row of slots -->
+                <div class="inventory-slot" data-slot="0"></div>
+                <div class="inventory-slot" data-slot="1"></div>
+                <div class="inventory-slot" data-slot="2"></div>
+                <div class="inventory-slot" data-slot="3"></div>
+                <div class="inventory-slot" data-slot="4"></div>
+                <div class="inventory-slot" data-slot="5"></div>
+                <div class="inventory-slot" data-slot="6"></div>
+                <div class="inventory-slot" data-slot="7"></div>
+                <div class="inventory-slot" data-slot="8"></div>
+                <div class="inventory-slot" data-slot="9"></div>
+              </div>
+              <div class="inventory-row">
+                <!-- Second row of slots -->
+                <div class="inventory-slot" data-slot="10"></div>
+                <div class="inventory-slot" data-slot="11"></div>
+                <div class="inventory-slot" data-slot="12"></div>
+                <div class="inventory-slot" data-slot="13"></div>
+                <div class="inventory-slot" data-slot="14"></div>
+                <div class="inventory-slot" data-slot="15"></div>
+                <div class="inventory-slot" data-slot="16"></div>
+                <div class="inventory-slot" data-slot="17"></div>
+                <div class="inventory-slot" data-slot="18"></div>
+                <div class="inventory-slot" data-slot="19"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>
