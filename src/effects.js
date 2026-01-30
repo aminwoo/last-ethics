@@ -215,8 +215,13 @@ function updateRain(rainParticles, playerPosition) {
     positions[idx + 4] += vy
     positions[idx + 5] += vz
 
-    // Reset raindrop if it hits the ground
-    if (positions[idx + 1] < 0) {
+    // Check distance from player (horizontal only)
+    const dx = positions[idx] - playerX
+    const dz = positions[idx + 2] - playerZ
+    const distFromPlayer = Math.abs(dx) > halfArea || Math.abs(dz) > halfArea
+
+    // Reset raindrop if it hits the ground OR is too far from player
+    if (positions[idx + 1] < 0 || distFromPlayer) {
       // Random position within the rain area, centered on player
       const newX = playerX + Math.random() * RAIN_AREA_SIZE - halfArea
       const newZ = playerZ + Math.random() * RAIN_AREA_SIZE - halfArea

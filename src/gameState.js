@@ -101,6 +101,8 @@ const gameState = {
   isGameOver: false,
   gameStartTime: 0,
   gameEndTime: 0,
+  gameTime: 0, // Time elapsed in game (seconds)
+  frameCount: 0, // Frame counter for throttling updates
 
   // Wave system properties
   currentWave: 0,
@@ -141,6 +143,8 @@ export function initializeGameState() {
   gameState.zombiesKilled.BRUTE = 0
   gameState.gameStartTime = Date.now()
   gameState.gameEndTime = 0
+  gameState.gameTime = 0
+  gameState.frameCount = 0
 
   // Reset wave properties
   gameState.currentWave = 0
