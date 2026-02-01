@@ -69,6 +69,7 @@ function initializeInventory() {
     previewCamera: null,
     previewRenderer: null,
     previewObject: null,
+    currentLoadId: 0, // Track current load to prevent stale async callbacks
 
     // Methods will be attached below
     toggle: null,
@@ -358,6 +359,9 @@ function showItemModel(inventory, item) {
 
   // If item has a model, load it
   if (item.modelPath) {
+    // Generate a unique load ID to track this specific load request
+    const loadId = ++inventory.currentLoadId
+
     // Create a new loader each time to ensure a fresh load
     const loader = new GLTFLoader()
 
@@ -373,6 +377,12 @@ function showItemModel(inventory, item) {
       cacheBustUrl,
       // On successful load
       (gltf) => {
+        // Check if this load is still current (user may have selected another item)
+        if (loadId !== inventory.currentLoadId) {
+          console.log('Discarding stale model load')
+          return
+        }
+
         // Remove loading indicator
         if (loadingDiv.parentNode) {
           loadingDiv.parentNode.removeChild(loadingDiv)
