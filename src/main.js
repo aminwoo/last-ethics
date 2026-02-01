@@ -13,6 +13,7 @@ import {
   getWaveInfo,
   setPlayerClass,
   getPlayerClassColor,
+  gameOver,
 } from './gameState.js'
 import {
   initializeUI,
@@ -687,13 +688,13 @@ function animate(time) {
   gameState.frameCount++
 
   // Check if game is over
-  if (gameState.health <= 0 && !gameState.gameOver) {
-    handleGameOver()
+  if (gameState.health <= 0 && !gameState.isGameOver) {
+    gameOver()
     return
   }
 
   // Skip rendering if game over
-  if (gameState.gameOver) {
+  if (gameState.isGameOver) {
     return
   }
 
@@ -837,11 +838,14 @@ function restartGame() {
   // Clean up resources
   cleanupResources()
 
-  // Re-initialize the game directly (skip welcome/class selection since we already have those)
-  initializeGameState()
+  // Recreate turrets at spawn position
+  turrets = createSpawnTurrets(scene, player.position)
 
   // Update UI to reflect reset state
   updateUI(ui, gameState)
+
+  // Reset lastTime to avoid large deltaTime on first frame after restart
+  lastTime = 0
 }
 
 // Function to update the multiplayer status display
