@@ -831,14 +831,17 @@ function updatePlayerAndFlashlight(deltaTime, inventoryIsOpen) {
 
 // Function to restart the game after game over
 function restartGame() {
+  // Hide game over screen
+  gameOverScreen.style.display = 'none'
+
   // Clean up resources
   cleanupResources()
 
-  // Reset game state
-  resetGame()
+  // Re-initialize the game directly (skip welcome/class selection since we already have those)
+  initializeGameState()
 
-  // Start new game
-  startGame()
+  // Update UI to reflect reset state
+  updateUI(ui, gameState)
 }
 
 // Function to update the multiplayer status display
