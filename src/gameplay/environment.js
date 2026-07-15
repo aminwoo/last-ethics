@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import SoundManager from './sound'
+import SoundManager from '../services/sound.js'
 import {
   RAIN_COUNT,
   RAIN_AREA_SIZE,
@@ -10,7 +10,7 @@ import {
   createThunderEffect,
   createFlashlight,
   updateFlashlight,
-} from './effects'
+} from './effects.js'
 
 // Create the environment elements
 function createEnvironment(scene, camera) {

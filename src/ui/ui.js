@@ -1,6 +1,6 @@
 // UI management for the game
-import { getScoreInfo } from './gameState.js'
-import { getClass } from './classes.js'
+import { getScoreInfo } from '../core/gameState.js'
+import { getClass } from '../core/classes.js'
 
 // Get UI elements from the DOM
 function initializeUI() {

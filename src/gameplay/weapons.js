@@ -1,7 +1,11 @@
 import * as THREE from 'three'
-import SoundManager from './sound.js'
+import SoundManager from '../services/sound.js'
 import { applyScreenShake } from './effects.js'
-import { calculateDamage, shouldConsumeAmmo, getReloadTime } from './classes.js'
+import {
+  calculateDamage,
+  shouldConsumeAmmo,
+  getReloadTime,
+} from '../core/classes.js'
 
 export const weapons = [
   {

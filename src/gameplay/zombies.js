@@ -2,13 +2,12 @@ import * as THREE from 'three'
 import {
   recordZombieKill,
   gameState,
-  setPlayerInvulnerable,
+  applyDamageToPlayer,
   isPlayerInvulnerable,
-  gameOver,
   getWaveDifficultyScaling,
   getWaveComposition,
-} from './gameState.js'
-import SoundManager from './sound.js'
+} from '../core/gameState.js'
+import SoundManager from '../services/sound.js'
 import { showDamageFlash, createDeathEffect } from './effects.js'
 
 // Zombie types with different characteristics
@@ -1429,11 +1428,7 @@ export function damagePlayer(player, damage) {
     return // Skip damage if player is invulnerable or game is over
   }
 
-  // Reduce player health by zombie damage amount
-  gameState.health = Math.max(0, gameState.health - damage)
-
-  // Make player invulnerable for a short time
-  setPlayerInvulnerable()
+  const actualDamage = applyDamageToPlayer(damage)
 
   // Show damage flash effect
   showDamageFlash()
@@ -1445,9 +1440,5 @@ export function damagePlayer(player, damage) {
     SoundManager.playPlayerHit()
   }
 
-  // Check if player has died
-  if (gameState.health <= 0) {
-    // Trigger game over
-    gameOver()
-  }
+  return actualDamage
 }

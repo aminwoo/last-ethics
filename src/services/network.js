@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
-import { createPlayer, animatePlayerLegs } from './player.js'
+import { createPlayer, animatePlayerLegs } from '../gameplay/player.js'
 import SoundManager from './sound.js'
 
 // WebSocket connection and player tracking
