@@ -1,9 +1,6 @@
 import * as THREE from 'three'
-import {
-  CSS2DRenderer,
-  CSS2DObject,
-} from 'three/examples/jsm/renderers/CSS2DRenderer.js'
-import SoundManager from './sound.js'
+import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import SoundManager from './services/sound.js'
 import {
   gameState,
   updateGameState,
@@ -12,16 +9,15 @@ import {
   initializeGameState,
   getWaveInfo,
   setPlayerClass,
-  getPlayerClassColor,
   gameOver,
-} from './gameState.js'
+} from './core/gameState.js'
 import {
   initializeUI,
   updateUI,
   updateCrosshair,
   initializeMinimap,
   updateMinimap,
-} from './ui.js'
+} from './ui/ui.js'
 import {
   initializeInput,
   setupKeyboardListeners,
@@ -32,9 +28,9 @@ import {
   initializePlayer,
   updatePlayerMovement,
   animatePlayerLegs,
-} from './player.js'
-import { createEnvironment, updateRain } from './environment.js'
-import { updateFlashlight } from './effects.js'
+} from './gameplay/player.js'
+import { createEnvironment, updateRain } from './gameplay/environment.js'
+import { updateFlashlight, updateScreenShake } from './gameplay/effects.js'
 import {
   handleWeaponSwitch,
   handleReload,
@@ -43,11 +39,14 @@ import {
   resetBullets,
   getBulletModel,
   addRemoteBullet,
-} from './weapons.js'
-import { updateScreenShake } from './effects.js'
-import * as ZombieSystem from './zombies.js'
+} from './gameplay/weapons.js'
+import * as ZombieSystem from './gameplay/zombies.js'
 // Import turret functionality
-import { createSpawnTurrets, updateTurrets, cleanupTurrets } from './turrets.js'
+import {
+  createSpawnTurrets,
+  updateTurrets,
+  cleanupTurrets,
+} from './gameplay/turrets.js'
 // Import networking functionality
 import {
   initializeNetworking,
@@ -56,13 +55,13 @@ import {
   cleanupNetworking,
   updateNetworking,
   setPlayerName,
-} from './network.js'
+} from './services/network.js'
 // Import chat functionality
-import { initializeChat } from './chat.js'
+import { initializeChat } from './ui/chat.js'
 // Import inventory functionality
-import { initializeInventory, toggleInventory } from './inventory.js'
+import { initializeInventory, toggleInventory } from './ui/inventory.js'
 // Import character classes
-import { getAllClasses, getClass } from './classes.js'
+import { getAllClasses, getClass } from './core/classes.js'
 
 // DOM elements
 const welcomeScreen = document.getElementById('welcome-screen')

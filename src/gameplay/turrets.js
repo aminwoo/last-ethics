@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import SoundManager from './sound.js'
+import SoundManager from '../services/sound.js'
 
 // Store all active turrets
 const turrets = []

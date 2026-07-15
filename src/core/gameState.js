@@ -4,9 +4,9 @@ import {
   switchWeapon,
   reloadWeapon,
   checkReloadCompletion,
-} from './weapons.js'
-import SoundManager from './sound.js'
-import { sendPlayerDeathEvent } from './network.js'
+} from '../gameplay/weapons.js'
+import SoundManager from '../services/sound.js'
+import { sendPlayerDeathEvent } from '../services/network.js'
 import { getClass, calculateDamageTaken } from './classes.js'
 
 // Score values for different zombie types

@@ -1,8 +1,8 @@
 import * as THREE from 'three'
-import SoundManager from './sound.js'
+import SoundManager from '../services/sound.js'
 import * as Weapons from './weapons.js'
-import { sendPlayerUpdate } from './network.js'
-import { gameState, getPlayerClassColor } from './gameState.js'
+import { sendPlayerUpdate } from '../services/network.js'
+import { gameState, getPlayerClassColor } from '../core/gameState.js'
 
 // Player movement speed (base values, modified by class)
 const PLAYER_SPEED = 0.07

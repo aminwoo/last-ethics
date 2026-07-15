@@ -32,17 +32,25 @@ A browser-based 3D zombie survival top-down shooter game built with Three.js. Fi
 last-ethics/
 ├── assets/           # Images and audio files
 ├── src/              # Source code
-│   ├── effects.js    # Visual effects (screen shake, etc.)
-│   ├── environment.js # Environmental elements and effects
-│   ├── gameState.js  # Core game state management
+│   ├── core/         # Shared game state and character definitions
+│   │   ├── classes.js
+│   │   └── gameState.js
+│   ├── gameplay/     # World, player, combat, and enemy systems
+│   │   ├── effects.js
+│   │   ├── environment.js
+│   │   ├── player.js
+│   │   ├── turrets.js
+│   │   ├── weapons.js
+│   │   └── zombies.js
+│   ├── services/     # Networking and audio services
+│   │   ├── network.js
+│   │   └── sound.js
+│   ├── ui/           # Interface and inventory modules
+│   │   ├── chat.js
+│   │   ├── inventory.js
+│   │   └── ui.js
 │   ├── input.js      # User input handling
-│   ├── main.js       # Main game initialization and loop
-│   ├── network.js    # Multiplayer networking functionality
-│   ├── player.js     # Player character implementation
-│   ├── sound.js      # Sound effects and music
-│   ├── ui.js         # User interface elements
-│   ├── weapons.js    # Weapon systems and mechanics
-│   └── zombies.js    # Enemy AI and behavior
+│   └── main.js       # Main game initialization and loop
 └── server/           # Multiplayer server implementation
     ├── server.js     # WebSocket server for multiplayer
     └── package.json  # Server dependencies
@@ -53,12 +61,14 @@ last-ethics/
 The game supports multiplayer functionality, allowing players to see and interact with each other in the same game world. To enable multiplayer:
 
 1. Install server dependencies:
+
    ```bash
    cd server
    npm install
    ```
 
 2. Start the multiplayer server:
+
    ```bash
    npm start
    ```
@@ -154,6 +164,7 @@ Special keys have been added to help test the zombie models:
 ### Console Output
 
 Testing commands will output information to the console (F12 to view):
+
 - Zombie health values
 - Damage applied
 - Death notifications
@@ -163,11 +174,13 @@ Enjoy testing the different zombie types!
 ## Multiplayer Features
 
 ### Player Presence
+
 - See other players moving in real-time
 - Players appear with bright red bodies, yellow heads, and a cyan beam
 - Player count shown in the top-right corner
 
 ### Chat System
+
 - Press 'T' to open the chat box
 - Type your message and press Enter to send
 - Press ESC to close the chat

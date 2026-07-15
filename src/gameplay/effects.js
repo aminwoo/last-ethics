@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import SoundManager from './sound'
+import SoundManager from '../services/sound.js'
 
 // Screen shake constants
 const SCREEN_SHAKE_DECAY = 0.9
