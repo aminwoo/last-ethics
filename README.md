@@ -38,6 +38,10 @@ Run `npm install`, then `npm start`. Open `http://localhost:5173`.
 `npm test` checks wave timing, rewards, upgrade stacking/reset, and survival time.
 `npm run build` creates the production build.
 
+To run the game the way it is deployed - one process serving the built client and
+the multiplayer socket on a single port - use `npm run serve:build`, then open
+`http://localhost:3000`. `PORT` overrides the port, and `/healthz` reports status.
+
 Solo play is the default. The game pauses when you open the field guide, choose
 an upgrade, or leave the browser tab. Each cleared wave supplies 15 health and
 two magazines of reserve ammunition per weapon. Upgrades stack for the current
@@ -75,26 +79,46 @@ last-ethics/
 
 ## Multiplayer Setup
 
-The game supports multiplayer functionality, allowing players to see and interact with each other in the same game world. To enable multiplayer:
+The game supports multiplayer functionality, allowing players to see and interact with each other in the same game world. The server dependencies live in the root `package.json`, so `npm install` at the root is all you need.
 
-1. Install server dependencies:
+**Against the Vite dev server** (hot reload while you work):
 
-   ```bash
-   cd server
-   npm install
-   ```
+```bash
+npm run serve   # terminal 1: multiplayer server on port 3000
+npm start       # terminal 2: Vite dev client on port 5173
+```
 
-2. Start the multiplayer server:
+Then open `http://localhost:5173/?multiplayer` in multiple browser windows.
 
-   ```bash
-   npm start
-   ```
+**Against a production build** (one process, one port):
 
-3. Open `http://localhost:5173/?multiplayer` in multiple browser windows.
+```bash
+npm run serve:build
+```
 
-The server runs on port 3000 by default. Add `?multiplayer` to opt into the
-existing experimental multiplayer mode; connection attempts do not block play.
-Waves and pause state are local to each client, not synchronized co-op progression.
+Then open `http://localhost:3000/?multiplayer`.
+
+Add `?multiplayer` to opt into the experimental multiplayer mode; connection
+attempts do not block play. Waves and pause state are local to each client, not
+synchronized co-op progression.
+
+### Choosing a server
+
+The client picks its WebSocket target from the page it was served by:
+
+| Page served from | Connects to |
+| --- | --- |
+| Vite dev/preview (`:5173`, `:4173`) | `ws://<same host>:3000` |
+| Anywhere else (the game server itself) | The same origin, `wss:` when the page is `https:` |
+
+Because production is same-origin, there is no server URL baked into the build -
+deploying to a new domain needs no code change. To point a client somewhere else,
+append `?server=host:port` (or a full `ws://`/`wss://` URL), which is handy for
+testing a local client against a deployed server:
+
+```
+http://localhost:5173/?multiplayer&server=wss://your-server.example.com
+```
 
 ### Multiplayer Troubleshooting
 
@@ -108,6 +132,36 @@ If you're having trouble with the multiplayer functionality:
 6. Try refreshing the page if players don't appear
 7. For local testing, you can open multiple browser windows to test with multiple players
 8. If you see multiple player counts on the server, try closing all browser windows and restarting both the server and clients
+
+## Deploying
+
+The game deploys as a single Render web service: one process serves the built
+client and the multiplayer WebSocket on the same port. Because the client derives
+its socket URL from the page's own origin, nothing needs rebuilding when the
+domain changes.
+
+`render.yaml` in the repo root is a Render blueprint. To deploy:
+
+1. Push this repo to GitHub (Render reads the blueprint from the default branch).
+2. In the Render dashboard, choose **New > Blueprint** and pick this repository.
+   Render reads `render.yaml` and proposes a `last-ethics` web service.
+3. Apply. The first build runs `npm ci --include=dev && npm run build`, then
+   starts `npm run serve`.
+4. Once live, the game is at `https://<your-service>.onrender.com/` and
+   multiplayer at `https://<your-service>.onrender.com/?multiplayer`.
+
+Check `https://<your-service>.onrender.com/healthz` for status, connected player
+count, and whether the client build was found.
+
+Notes:
+
+- `PORT` is supplied by Render; the server binds it automatically.
+- The free plan sleeps after ~15 minutes with no traffic, so the first request
+  after an idle period takes 30-60 seconds and open sockets drop. The client
+  retries with exponential backoff (6 attempts) and rebuilds its player list from
+  the server's `init` on reconnect, so a sleeping server recovers on its own.
+- `--include=dev` in the build command matters: Render sets `NODE_ENV=production`,
+  which would otherwise skip Vite and leave the client unbuilt.
 
 ## Contributing
 
