@@ -4,12 +4,15 @@ A browser-based 3D zombie survival top-down shooter game built with Three.js. Fi
 
 ## Features
 
-- Five different weapons: Chainsaw, Pistol, Shotgun, Grenade launcher, and SMG
+- Four weapons: Pistol, Shotgun, Assault Rifle, and piercing Sniper Rifle
+- Six specialist classes with distinct passive abilities
+- Choose one of three randomized permanent upgrades after each wave
+- Wave-clear health and ammunition supplies, with escalating hordes
+- Tactical title screen, field guide, hit markers, kill feed, and local personal best
 - Dynamic weapon switching and reloading system
 - Atmospheric effects including rain and thunder
 - Resource management (ammo, health, stamina)
-- Lootable bodies from defeated zombies
-- Environmental obstacles for tactical gameplay
+- Defensive turrets and a rain-soaked, illuminated landing zone
 - Modern UI with health, stamina, and ammo indicators
 - Multiplayer support for playing with friends
 - In-game chat system for player communication
@@ -21,10 +24,24 @@ A browser-based 3D zombie survival top-down shooter game built with Three.js. Fi
 - Mouse - Aim
 - Left Click - Shoot
 - R - Reload
-- 1,2,3 - Switch Weapons
+- 1–4 - Switch Weapons
+- F - Toggle flashlight
+- I - Inventory
+- ENTER - Call the next wave early during intermission
 - ESC - Pause Game
 - T - Open Chat / Start Typing
 - ESC (while typing) - Close Chat
+
+## Run locally
+
+Run `npm install`, then `npm start`. Open `http://localhost:5173`.
+`npm test` checks wave timing, rewards, upgrade stacking/reset, and survival time.
+`npm run build` creates the production build.
+
+Solo play is the default. The game pauses when you open the field guide, choose
+an upgrade, or leave the browser tab. Each cleared wave supplies 15 health and
+two magazines of reserve ammunition per weapon. Upgrades stack for the current
+run; restarting restores the selected class and original weapon stats.
 
 ## Project Structure
 
@@ -73,9 +90,11 @@ The game supports multiplayer functionality, allowing players to see and interac
    npm start
    ```
 
-3. Open the game in multiple browser windows or on different computers connected to the same network.
+3. Open `http://localhost:5173/?multiplayer` in multiple browser windows.
 
-The server runs on port 3000 by default, and the game client will automatically connect to it when launched.
+The server runs on port 3000 by default. Add `?multiplayer` to opt into the
+existing experimental multiplayer mode; connection attempts do not block play.
+Waves and pause state are local to each client, not synchronized co-op progression.
 
 ### Multiplayer Troubleshooting
 

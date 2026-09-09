@@ -13,7 +13,7 @@ import { showDamageFlash, createDeathEffect } from './effects.js'
 // Zombie types with different characteristics
 const ZOMBIE_TYPES = {
   REGULAR: {
-    speed: 0.015,
+    speed: 0.035,
     health: 100,
     damage: 20,
     color: 0x2d7c3f, // Sickly green
@@ -22,7 +22,7 @@ const ZOMBIE_TYPES = {
     size: { width: 0.8, height: 1.8, depth: 0.5 },
   },
   RUNNER: {
-    speed: 0.04,
+    speed: 0.075,
     health: 80,
     damage: 15,
     color: 0x8fbc8f, // Light green
