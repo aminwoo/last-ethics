@@ -41,6 +41,7 @@ import {
   addRemoteBullet,
 } from './gameplay/weapons.js'
 import * as ZombieSystem from './gameplay/zombies.js'
+import { disposeCharacterSprite } from './gameplay/sprites.js'
 // Import turret functionality
 import {
   createSpawnTurrets,
@@ -422,6 +423,7 @@ async function initializeGame() {
 
   // Create player
   player = initializePlayer(scene, gameState)
+  await player.userData.visualReady
 
   // Create turrets at player spawn position
   turrets = createSpawnTurrets(scene, player.position)
@@ -702,7 +704,7 @@ function animate(time) {
   }
 
   // Update networking
-  updateNetworking()
+  updateNetworking(deltaTime)
 
   // Update rain every frame for smooth animation
   if (environment && environment.rainParticles) {
@@ -739,7 +741,9 @@ function updatePlayerAndFlashlight(deltaTime, inventoryIsOpen) {
   const isMoving =
     shouldUpdateMovement &&
     (input.keys.w || input.keys.a || input.keys.s || input.keys.d)
-  animatePlayerLegs(player, isMoving, deltaTime, input.keys.shift)
+  // Reload completion follows weapon state, including time spent in a paused menu.
+  if (!gameState.weapon.isReloading) player.userData.animationState.reloading = false
+  animatePlayerLegs(player, isMoving, deltaTime, input.keys.shift && gameState.stamina > 0)
 
   // Send player position update to server
   // More frequent updates in the first 5 seconds to ensure initial position is set
@@ -811,12 +815,13 @@ function cleanupResources() {
   // Clear existing zombies
   while (ZombieSystem.getZombies().length > 0) {
     const zombie = ZombieSystem.getZombies()[0]
+    disposeCharacterSprite(zombie)
     scene.remove(zombie)
     ZombieSystem.getZombies().splice(0, 1)
   }
 
   // Reset player position
-  player.position.set(0, 1, 0)
+  player.position.set(0, 0, 0)
   handleWeaponSwitch(player, 0, switchWeapon, gameState)
 
   // Reset player health and UI

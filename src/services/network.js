@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import { createPlayer, animatePlayerLegs } from '../gameplay/player.js'
+import { disposePlayerVisual, triggerPlayerShot } from '../gameplay/playerVisual.js'
 import SoundManager from './sound.js'
 
 // WebSocket connection and player tracking
@@ -458,6 +459,7 @@ function addRemotePlayer(playerData, scene) {
 
   // Use the same player model creation function as the main player
   const remotePlayer = createPlayer()
+  remotePlayer.userData.visualReady.catch(error => console.error('Remote survivor could not load:', error))
   remotePlayer.name = `remote-player-${playerData.id}`
 
   // Add a CSS2D name tag above the player
@@ -574,6 +576,7 @@ function updateRemotePlayerTransform(playerObject, playerData) {
 
   // Handle weapon firing
   if (playerData.isFiring) {
+    triggerPlayerShot(playerObject, { name: playerData.weaponType })
     // Create muzzle flash for remote player
     createRemotePlayerMuzzleFlash(playerObject, playerData.weaponType)
 
@@ -588,16 +591,9 @@ function updateRemotePlayerTransform(playerObject, playerData) {
   // Check if player is moving by comparing positions
   const isMoving = prevPosition.distanceTo(playerObject.position) > 0.01
 
-  // Initialize userData if it doesn't exist yet (for animation state)
-  if (!playerObject.userData.animationTime) {
-    playerObject.userData.animationTime = 0
-    playerObject.userData.walkSpeed = 1.0
-  }
+  // The frame loop advances both idle and moving actors using simulation time.
+  playerObject.userData.isWalking = isMoving
 
-  // Animate the player based on movement
-  // Using a small deltaTime value for smooth animation
-  const deltaTime = 0.016 // ~60fps
-  animatePlayerLegs(playerObject, isMoving, deltaTime, false)
 }
 
 /**
@@ -643,7 +639,8 @@ function removeRemotePlayer(playerId, scene) {
     }
   }
 
-  // Remove player from scene
+  // Release the per-player material, retaining the shared atlas.
+  disposePlayerVisual(playerObject)
   scene.remove(playerObject)
 
   // Remove from tracking Map
@@ -734,17 +731,14 @@ function cleanupNetworking() {
 /**
  * Update networking state
  */
-function updateNetworking() {
+function updateNetworking(deltaTime = 1 / 60) {
   // Update debug display
   updateDebugDisplay()
 
   // Update animations for remote players
-  const deltaTime = 0.016 // ~60fps
   remotePlayers.forEach((playerObject) => {
     // If the player has been marked as moving, continue animation
-    if (playerObject.userData.isWalking) {
-      animatePlayerLegs(playerObject, true, deltaTime, false)
-    }
+    animatePlayerLegs(playerObject, playerObject.userData.isWalking, deltaTime, false)
   })
 }
 
