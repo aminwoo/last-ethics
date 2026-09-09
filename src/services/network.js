@@ -10,10 +10,16 @@ let playerId
 window.playerId = null // Expose to global for chat functionality
 const remotePlayers = new Map() // Map of remote player IDs to their THREE.Group objects
 let onPlayersUpdated = null // Callback function when player list changes
+let reconnectAttempts = 0
+let reconnectTimer = null
+let intentionalDisconnect = false
+const MAX_RECONNECT_ATTEMPTS = 6
 
 // Debug helpers
 let debugElement = null
 let showDetailedDebug = false
+let debugRefreshTimer = 0
+const DEBUG_REFRESH_INTERVAL = 0.25 // seconds
 
 // Chat message handling
 const chatMessages = [] // Store recent chat messages
@@ -210,6 +216,47 @@ function updateRemotePlayerFlashlight(
   flashlight.light.position.set(0, 1.5, 0)
 }
 
+const DEV_CLIENT_PORTS = new Set(['5173', '4173']) // vite dev / vite preview
+const DEFAULT_GAME_SERVER_PORT = '3000'
+
+/**
+ * Work out which WebSocket server to talk to.
+ *
+ * In production the game server serves the built client and the socket on one
+ * origin, so same-origin is always right and needs no redeploy when the domain
+ * changes. The exception is the Vite dev server, which serves the client on its
+ * own port while the game server listens elsewhere. `?server=host:port` overrides
+ * both, which is what you want when testing against a remote or non-default port.
+ *
+ * @returns {string} A ws:// or wss:// URL
+ */
+function resolveServerUrl() {
+  const override = new URLSearchParams(window.location.search).get('server')
+  if (override) {
+    const url = /^wss?:\/\//.test(override)
+      ? override
+      : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${override}`
+    console.log(`Using WebSocket server from ?server= override: ${url}`)
+    return url
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+
+  // Served by Vite (or opened straight off the filesystem): the game server is a
+  // separate process, conventionally on port 3000 of the same host.
+  if (DEV_CLIENT_PORTS.has(window.location.port) || !window.location.host) {
+    const host = window.location.hostname || 'localhost'
+    const url = `${protocol}//${host}:${DEFAULT_GAME_SERVER_PORT}`
+    console.log(`Dev client detected, using local WebSocket server: ${url}`)
+    return url
+  }
+
+  // Served by the game server itself - reuse this exact origin.
+  const url = `${protocol}//${window.location.host}`
+  console.log(`Using same-origin WebSocket server: ${url}`)
+  return url
+}
+
 /**
  * Initialize the WebSocket connection to the game server
  * @param {Function} playerUpdatedCallback - Callback when player list changes
@@ -218,39 +265,28 @@ function updateRemotePlayerFlashlight(
  */
 function initializeNetworking(playerUpdatedCallback, scene) {
   onPlayersUpdated = playerUpdatedCallback
+  intentionalDisconnect = false
 
   // Create debug display
   createDebugDisplay()
 
-  // Determine whether to use local or production WebSocket URL
-  // Check if we're on localhost or a real domain
-  const isLocalhost =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname === ''
-
-  let wsUrl
-  if (isLocalhost) {
-    // Local development - use local WebSocket server
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = 'localhost'
-    const port = 3000 // Match the local server port
-    wsUrl = `${protocol}//${host}:${port}`
-    console.log('Using local WebSocket server')
-  } else {
-    // Production environment - use deployed server
-    wsUrl = 'wss://last-ethics-server.onrender.com'
-    console.log('Using production WebSocket server')
-  }
+  const wsUrl = resolveServerUrl()
 
   console.log(`Attempting to connect to WebSocket server at: ${wsUrl}`)
 
   return new Promise((resolve, reject) => {
+    // A socket can both open and later close; settling twice is a no-op on a
+    // promise, but tracking it keeps the reconnect path from logging phantom
+    // failures for a connection that already succeeded.
+    let settled = false
+
     try {
       socket = new WebSocket(wsUrl)
 
       socket.onopen = () => {
         console.log('Connected to game server successfully!')
+        settled = true
+        reconnectAttempts = 0
         resolve()
 
         // Send an initial position update immediately after connection
@@ -269,22 +305,51 @@ function initializeNetworking(playerUpdatedCallback, scene) {
 
       socket.onerror = (error) => {
         console.error('WebSocket error:', error)
-        reject(error)
+        if (!settled) {
+          settled = true
+          reject(error)
+        }
       }
 
       socket.onclose = (event) => {
         console.log(
           `Disconnected from game server. Code: ${event.code}, Reason: ${event.reason}`,
         )
-        // Try to reconnect after a delay if the connection was established before
-        if (playerId) {
-          console.log('Will attempt to reconnect in 5 seconds...')
-          setTimeout(() => {
-            initializeNetworking(playerUpdatedCallback, scene).catch((err) =>
-              console.error('Reconnection failed:', err),
-            )
-          }, 5000)
+
+        // Everyone we knew about is stale now - the server reissues the full
+        // roster in the next `init`, so keeping the old models around would
+        // leave frozen duplicates standing in the world.
+        clearRemotePlayers(scene)
+        playerId = null
+        window.playerId = null
+
+        if (intentionalDisconnect) return
+
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          console.warn(
+            `Giving up after ${MAX_RECONNECT_ATTEMPTS} reconnection attempts.`,
+          )
+          addChatMessage(
+            'system',
+            'System',
+            'Lost connection to the server. Reload to rejoin.',
+            Date.now(),
+            true,
+          )
+          return
         }
+
+        // Back off so a server that is down or restarting is not hammered.
+        const delay = Math.min(30000, 1000 * 2 ** reconnectAttempts)
+        reconnectAttempts += 1
+        console.log(
+          `Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms...`,
+        )
+        reconnectTimer = setTimeout(() => {
+          initializeNetworking(playerUpdatedCallback, scene).catch((err) =>
+            console.error('Reconnection failed:', err),
+          )
+        }, delay)
       }
 
       socket.onmessage = (event) => {
@@ -292,9 +357,25 @@ function initializeNetworking(playerUpdatedCallback, scene) {
       }
     } catch (error) {
       console.error('Failed to connect to server:', error)
-      reject(error)
+      if (!settled) {
+        settled = true
+        reject(error)
+      }
     }
   })
+}
+
+/**
+ * Remove every remote player model from the scene and forget them.
+ * @param {THREE.Scene} scene - The game scene
+ */
+function clearRemotePlayers(scene) {
+  if (!scene) {
+    remotePlayers.clear()
+    return
+  }
+  // removeRemotePlayer mutates the map, so iterate over a snapshot of the keys.
+  Array.from(remotePlayers.keys()).forEach((id) => removeRemotePlayer(id, scene))
 }
 
 /**
@@ -423,6 +504,14 @@ function handleServerMessage(messageData, scene) {
       case 'playerDied':
         console.log(`Player ${message.playerId} died`)
         handleRemotePlayerDeath(message.playerId, message.playerName, scene)
+        break
+
+      case 'playerRespawned':
+        // Their model was removed when they died, so rebuild it in place.
+        console.log(`Player ${message.player.id} respawned`)
+        if (message.player.id !== playerId) {
+          addRemotePlayer(message.player, scene)
+        }
         break
 
       default:
@@ -657,17 +746,9 @@ function removeRemotePlayer(playerId, scene) {
  * @param {THREE.Object3D} playerObject - The local player object
  */
 function sendPlayerUpdate(playerObject, isFiring = false, weaponType = null) {
-  if (!socket) {
-    console.warn('Cannot send player update: WebSocket not initialized')
-    return
-  }
-
-  if (socket.readyState !== WebSocket.OPEN) {
-    console.warn(
-      `Cannot send player update: WebSocket not open (state: ${socket.readyState})`,
-    )
-    return
-  }
+  // Called from the per-frame movement path, and solo play never opens a socket,
+  // so this stays silent - logging here floods the console at frame rate.
+  if (!socket || socket.readyState !== WebSocket.OPEN) return
 
   const message = {
     type: 'update',
@@ -709,6 +790,14 @@ function getRemotePlayers() {
  * Clean up networking resources
  */
 function cleanupNetworking() {
+  // Tell the close handler this was us, so it does not try to reconnect.
+  intentionalDisconnect = true
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  reconnectAttempts = 0
+
   // Close the WebSocket
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.close()
@@ -732,8 +821,13 @@ function cleanupNetworking() {
  * Update networking state
  */
 function updateNetworking(deltaTime = 1 / 60) {
-  // Update debug display
-  updateDebugDisplay()
+  // Refresh the debug overlay a few times a second rather than every frame -
+  // rebuilding its innerHTML at frame rate is pure layout thrash.
+  debugRefreshTimer += deltaTime
+  if (debugRefreshTimer >= DEBUG_REFRESH_INTERVAL) {
+    debugRefreshTimer = 0
+    updateDebugDisplay()
+  }
 
   // Update animations for remote players
   remotePlayers.forEach((playerObject) => {
@@ -1279,6 +1373,38 @@ function sendPlayerDeathEvent() {
 }
 
 /**
+ * Tell the server we are back in the world after dying or restarting a run.
+ * @param {THREE.Object3D} playerObject - The local player object
+ */
+function sendPlayerRespawnEvent(playerObject) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return false
+
+  console.log('Sending player respawn event to server')
+
+  socket.send(
+    JSON.stringify({
+      type: 'playerRespawn',
+      position: playerObject
+        ? {
+            x: playerObject.position.x,
+            y: playerObject.position.y,
+            z: playerObject.position.z,
+          }
+        : undefined,
+      rotation: playerObject
+        ? {
+            x: playerObject.rotation.x,
+            y: playerObject.rotation.y,
+            z: playerObject.rotation.z,
+          }
+        : undefined,
+    }),
+  )
+
+  return true
+}
+
+/**
  * Handle a remote player death event
  * @param {number} deadPlayerId - ID of the player who died
  * @param {string} playerName - Name of the player who died
@@ -1416,4 +1542,5 @@ export {
   createRemotePlayerFlashlight,
   updateRemotePlayerFlashlight,
   sendPlayerDeathEvent,
+  sendPlayerRespawnEvent,
 }

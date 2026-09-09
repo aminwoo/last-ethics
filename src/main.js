@@ -55,6 +55,7 @@ import {
   getRemotePlayers,
   cleanupNetworking,
   updateNetworking,
+  sendPlayerRespawnEvent,
   setPlayerName,
 } from './services/network.js'
 // Import chat functionality
@@ -790,6 +791,9 @@ function restartGame() {
 
   // Reset lastTime to avoid large deltaTime on first frame after restart
   lastTime = 0
+
+  // Peers removed our model when we died; tell them we are back.
+  sendPlayerRespawnEvent(player)
 }
 
 // Function to update the multiplayer status display

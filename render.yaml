@@ -1,0 +1,21 @@
+# Render blueprint: one web service serves both the built client and the
+# multiplayer WebSocket on the same port, which is why the client resolves its
+# socket URL from window.location rather than a baked-in hostname.
+services:
+  - type: web
+    name: last-ethics
+    runtime: node
+    plan: free
+    region: oregon
+
+    # --include=dev because vite is a devDependency and the build needs it.
+    # Render sets NODE_ENV=production, which would otherwise skip it.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run serve
+
+    # The server binds process.env.PORT, which Render assigns.
+    healthCheckPath: /healthz
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

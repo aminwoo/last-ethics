@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import { sendPlayerUpdate } from '../services/network.js'
 import { attachPlayerVisual, createAnimationState, updatePlayerVisual } from './playerVisual.js'
 
 // Player movement speed (base values, modified by class)
@@ -113,8 +112,6 @@ function updatePlayerMovement(
   if (direction.x !== 0 || direction.z !== 0) {
     player.rotation.y = Math.atan2(direction.x, direction.z)
   }
-
-  sendPlayerUpdate(player)
 
   return direction
 }
