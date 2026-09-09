@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { triggerPlayerShot, triggerPlayerReload, cancelPlayerAction } from './playerVisual.js'
 import SoundManager from '../services/sound.js'
 import { applyScreenShake } from './effects.js'
 import {
@@ -403,6 +404,7 @@ export function handleWeaponSwitch(
 ) {
   // Use the imported switchWeapon function
   if (weaponIndex === gameState.currentWeaponIndex || switchWeaponFn(gameState, weaponIndex)) {
+    cancelPlayerAction(player)
     // Play weapon switch sound (if available)
     if (SoundManager.playWeaponSwitch) {
       SoundManager.playWeaponSwitch()
@@ -447,6 +449,7 @@ export function handleWeaponSwitch(
 // Function to handle weapon reloading
 export function handleReload(player, reloadWeaponFn, gameState) {
   if (reloadWeaponFn(gameState)) {
+    triggerPlayerReload(player, getReloadTime(gameState.weapon.reloadTime, gameState.classStats || {}))
     SoundManager.playReload()
     return true
   }
@@ -511,7 +514,7 @@ export function createMuzzleFlash(player, scene) {
     }
 
     // Position at the exact end of the barrel
-    muzzleFlashGroup.position.set(0, 0, barrelLength / 2)
+    muzzleFlashGroup.position.set(0, 0, gunBarrel.userData.isMuzzleTip ? 0 : barrelLength / 2)
 
     // Create a small sphere for the visual flash effect (no PointLight for performance)
     let flashSize
@@ -722,6 +725,8 @@ export function handleShooting(input, player, scene, gameState) {
 
     // Apply the screen shake effect
     applyScreenShake(weapon.shakeIntensity)
+
+    triggerPlayerShot(player, weapon)
 
     // Add muzzle flash effect
     createMuzzleFlash(player, scene)
