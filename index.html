@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Zombie Top-Down Shooter</title>
+    <title>Last Ethics — Hold the line.</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111510" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,14 +13,20 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/game-ui.css" />
+    <link rel="stylesheet" href="/css/survival.css" />
   </head>
   <body>
     <div id="gameContainer"></div>
 
     <div id="welcome-screen">
+      <div class="menu-topline"><a class="wordmark" href="/">LE<span> / </span> LAST ETHICS</a><span class="signal"><i></i> SURVIVAL PROTOCOL ACTIVE</span></div>
+      <div class="menu-art" aria-hidden="true"></div>
+      <div class="sector-stamp" aria-hidden="true">RESTRICTED AREA<br><strong>SECTOR 07</strong><span>35° 41′ N / 139° 41′ E</span></div>
       <div class="welcome-content">
-        <h1>LAST ETHICS</h1>
-        <h2>Zombie Apocalypse</h2>
+        <div class="eyebrow"><span>01 / OPERATION NIGHTFALL</span> ENDLESS SURVIVAL</div>
+        <h1>LAST<br><span>ETHICS</span><b>®</b></h1>
+        <h2>The world ended.<br>Your shift didn't.</h2>
+        <p class="mission-copy">No extraction. No second line of defense.<br>Choose your specialist. Load your weapon. Make it count.</p>
 
         <div class="welcome-form">
           <div class="input-group">
@@ -26,27 +34,28 @@
             <input
               type="text"
               id="username"
-              placeholder="Enter your name"
+              placeholder="Your callsign"
               maxlength="15"
-              value="Rick"
+              value="Survivor"
               autofocus
             />
           </div>
 
-          <button id="join-game-btn">JOIN THE FIGHT</button>
+          <button id="join-game-btn">DEPLOY TO SECTOR <span>↗</span></button>
         </div>
 
         <div class="game-description">
-          <p>The world has fallen. You are humanity's last hope.</p>
-          <p>Survive. Fight. Prevail.</p>
+          <p><span class="signal-dot"></span> SOLO READY <span class="divider">/</span> <span id="personal-best">YOUR NEXT RUN STARTS HERE</span></p>
         </div>
       </div>
+      <div class="menu-bottom"><div><b>06</b><span>SPECIALIST CLASSES</span></div><div><b>04</b><span>WEAPONS. NO EXCUSES.</span></div><div><b>∞</b><span>WAVES TO SURVIVE</span></div><p>WASD TO MOVE <span>•</span> MOUSE TO AIM & FIRE<br><small>HEADPHONES RECOMMENDED</small></p></div>
     </div>
 
     <!-- Class Selection Screen -->
     <div id="class-selection-screen" style="display: none">
       <div class="class-selection-content">
-        <h1>CHOOSE YOUR CLASS</h1>
+        <div class="eyebrow">02 / SELECT YOUR SPECIALIST</div>
+        <h1>WHO HOLDS THE LINE?</h1>
         <h2 id="player-name-display">Survivor</h2>
 
         <div class="class-grid">
@@ -338,6 +347,7 @@
         <p>F - Toggle Flashlight</p>
         <p>1-4 - Change Weapon</p>
         <p>I - Inventory</p>
+        <p>Esc - Pause / field guide</p>
       </div>
       <div id="status-panel">
         <div class="status-container class-indicator">

@@ -18,10 +18,10 @@ export const SCORE_VALUES = {
 
 // Wave settings - zombies per wave increases with each wave
 export const WAVE_SETTINGS = {
-  initialZombies: 5,
-  zombiesPerWaveIncrease: 2, // Increased from 3 to 6
+  initialZombies: 10,
+  zombiesPerWaveIncrease: 4,
   maxWaves: 20, // Maximum number of waves (for difficulty scaling purposes)
-  timeBetweenWaves: 30, // seconds
+  timeBetweenWaves: 12, // seconds to regroup after choosing an upgrade
   waveCompleteBonusScore: 500, // Bonus points for completing a wave
 
   // Scaling factors for zombie difficulty - drastically increased
@@ -37,13 +37,13 @@ export const WAVE_SETTINGS = {
   composition: [
     // Wave 1-3: Mostly regular zombies, few runners
     { REGULAR: 1.0, RUNNER: 0.0, BRUTE: 0.0 }, // Wave 1: 100% Regular zombies
-    { REGULAR: 0.95, RUNNER: 0.05, BRUTE: 0.0 }, // Wave 2: Introduce small number of Runners
-    { REGULAR: 0.9, RUNNER: 0.1, BRUTE: 0.0 }, // Wave 3: Slight increase in Runners
+    { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0.0 }, // Wave 2: Introduce runners
+    { REGULAR: 0.8, RUNNER: 0.2, BRUTE: 0.0 }, // Wave 3
 
     // Wave 4-6: Gradually increase runners, still mostly regulars
-    { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0.0 }, // Wave 4: More Runners
-    { REGULAR: 0.8, RUNNER: 0.2, BRUTE: 0.0 }, // Wave 5: Even more Runners
-    { REGULAR: 0.75, RUNNER: 0.25, BRUTE: 0.0 }, // Wave 6: Quarter of zombies are Runners
+    { REGULAR: 0.75, RUNNER: 0.15, BRUTE: 0.1 }, // Wave 4: Introduce brutes
+    { REGULAR: 0.7, RUNNER: 0.2, BRUTE: 0.1 }, // Wave 5
+    { REGULAR: 0.65, RUNNER: 0.25, BRUTE: 0.1 }, // Wave 6
 
     // Wave 7-9: Introduce brutes, reduce regulars further
     { REGULAR: 0.7, RUNNER: 0.25, BRUTE: 0.05 }, // Wave 7: Introduce small number of Brutes
@@ -99,6 +99,8 @@ const gameState = {
   invulnerabilityTime: 0,
   invulnerabilityDuration: 1.0, // 1 second of invulnerability after being hit
   isGameOver: false,
+  isPaused: false,
+  upgrades: 0,
   gameStartTime: 0,
   gameEndTime: 0,
   gameTime: 0, // Time elapsed in game (seconds)
@@ -124,8 +126,6 @@ const gameState = {
   },
 }
 
-let pendingWaveStartTimeout = null
-
 function createFreshWeaponState() {
   return weapons.map((weapon) => ({
     ...weapon,
@@ -138,11 +138,6 @@ function createFreshWeaponState() {
 
 // Initialize game state with starting time
 export function initializeGameState() {
-  if (pendingWaveStartTimeout !== null) {
-    clearTimeout(pendingWaveStartTimeout)
-    pendingWaveStartTimeout = null
-  }
-
   gameState.weapons = createFreshWeaponState()
   gameState.currentWeaponIndex = 0
 
@@ -157,6 +152,8 @@ export function initializeGameState() {
   gameState.isInvulnerable = false
   gameState.invulnerabilityTime = 0
   gameState.isGameOver = false
+  gameState.isPaused = false
+  gameState.upgrades = 0
   gameState.score = 0
   gameState.zombiesKilled.REGULAR = 0
   gameState.zombiesKilled.RUNNER = 0
@@ -171,13 +168,8 @@ export function initializeGameState() {
   gameState.waveInProgress = false
   gameState.zombiesRemainingInWave = 0
   gameState.timeSinceLastWave = 0
-  gameState.nextWaveCountdown = WAVE_SETTINGS.timeBetweenWaves
-
-  // Start the first wave after a short delay
-  pendingWaveStartTimeout = setTimeout(() => {
-    pendingWaveStartTimeout = null
-    startNextWave()
-  }, 3000)
+  gameState.nextWaveCountdown = 3
+  document.dispatchEvent(new CustomEvent('runReset'))
 }
 
 // Set the player's class and apply stats
@@ -235,9 +227,7 @@ export function gameOver() {
   }
 
   // Calculate survival time in seconds
-  const survivalTimeInSeconds = Math.floor(
-    (gameState.gameEndTime - gameState.gameStartTime) / 1000,
-  )
+  const survivalTimeInSeconds = Math.floor(gameState.gameTime)
   const minutes = Math.floor(survivalTimeInSeconds / 60)
   const seconds = survivalTimeInSeconds % 60
   const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`
@@ -284,13 +274,14 @@ export function gameOver() {
   // Show game over screen
   const gameOverScreen = document.getElementById('game-over-screen')
   gameOverScreen.style.display = 'flex'
+  document.dispatchEvent(new CustomEvent('runEnded'))
 
   console.log('Game Over!')
 }
 
 // Wave system functions
 export function startNextWave() {
-  if (gameState.isGameOver || gameState.waveInProgress) return
+  if (gameState.isGameOver || gameState.isPaused || gameState.waveInProgress) return
 
   gameState.currentWave++
   gameState.waveInProgress = true
@@ -345,6 +336,7 @@ function recordZombieKill(zombieType) {
   // Add score based on zombie type
   const scoreValue = SCORE_VALUES[zombieType] || SCORE_VALUES.REGULAR
   addScore(scoreValue)
+  document.dispatchEvent(new CustomEvent('zombieKilled', { detail: { zombieType, scoreValue } }))
 
   // Update zombies remaining in current wave
   if (gameState.waveInProgress) {
@@ -365,6 +357,12 @@ function completeWave() {
 
   // Award bonus points for completing the wave
   addScore(WAVE_SETTINGS.waveCompleteBonusScore * gameState.currentWave)
+  // Supplies keep every weapon viable over a long run.
+  gameState.weapons.forEach((weapon) => {
+    weapon.totalAmmo = Math.min(weapon.totalAmmo + weapon.maxAmmo * 2, 999)
+  })
+  gameState.health = Math.min(gameState.maxHealth, gameState.health + 15)
+  document.dispatchEvent(new CustomEvent('waveComplete', { detail: { wave: gameState.currentWave } }))
 
   console.log(
     `Wave ${gameState.currentWave} completed! Next wave in ${WAVE_SETTINGS.timeBetweenWaves} seconds`,
@@ -421,7 +419,7 @@ export function getWaveDifficultyScaling() {
 // Update game state based on player actions
 function updateGameState(deltaTime, keys) {
   // Skip updates if game is over
-  if (gameState.isGameOver) return
+  if (gameState.isGameOver || gameState.isPaused) return
 
   // Update stamina based on sprinting
   if (keys.shift && (keys.w || keys.a || keys.s || keys.d)) {
@@ -460,7 +458,7 @@ function updateGameState(deltaTime, keys) {
     gameState.timeSinceLastWave += deltaTime
     gameState.nextWaveCountdown = Math.max(
       0,
-      WAVE_SETTINGS.timeBetweenWaves - gameState.timeSinceLastWave,
+      (gameState.currentWave === 0 ? 3 : WAVE_SETTINGS.timeBetweenWaves) - gameState.timeSinceLastWave,
     )
 
     // Start next wave when countdown reaches zero

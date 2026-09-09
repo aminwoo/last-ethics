@@ -11,10 +11,10 @@ export const weapons = [
   {
     name: 'Pistol',
     damage: 25,
-    ammo: 120,
-    maxAmmo: 120,
-    totalAmmo: 999,
-    fireRate: 0.5,
+    ammo: 12,
+    maxAmmo: 12,
+    totalAmmo: 96,
+    fireRate: 0.25,
     lastFired: 0,
     reloadTime: 1.5,
     isReloading: false,
@@ -32,7 +32,7 @@ export const weapons = [
     damage: 9,
     ammo: 6,
     maxAmmo: 6,
-    totalAmmo: 999,
+    totalAmmo: 48,
     fireRate: 1.0,
     lastFired: 0,
     reloadTime: 2.5,
@@ -51,7 +51,7 @@ export const weapons = [
     damage: 30,
     ammo: 30,
     maxAmmo: 30,
-    totalAmmo: 999,
+    totalAmmo: 180,
     fireRate: 0.08,
     lastFired: 0,
     reloadTime: 2.0,
@@ -71,7 +71,7 @@ export const weapons = [
     damage: 100,
     ammo: 5,
     maxAmmo: 5,
-    totalAmmo: 999,
+    totalAmmo: 30,
     fireRate: 1.5,
     lastFired: 0,
     reloadTime: 3.0,
@@ -402,7 +402,7 @@ export function handleWeaponSwitch(
   gameState,
 ) {
   // Use the imported switchWeapon function
-  if (switchWeaponFn(gameState, weaponIndex)) {
+  if (weaponIndex === gameState.currentWeaponIndex || switchWeaponFn(gameState, weaponIndex)) {
     // Play weapon switch sound (if available)
     if (SoundManager.playWeaponSwitch) {
       SoundManager.playWeaponSwitch()
@@ -1137,15 +1137,20 @@ function shootBullet(input, weapon, player, scene) {
   }
 }
 
-export function updateBullets(scene, zombies = []) {
-  const currentTime = Date.now()
+const bulletSegment = new THREE.Line3()
+const closestBulletPoint = new THREE.Vector3()
+
+export function updateBullets(scene, zombies = [], deltaTime = 1 / 60) {
 
   // Update local player bullets
   for (let i = bullets.length - 1; i >= 0; i--) {
     const bullet = bullets[i]
+    bullet.age = (bullet.age || 0) + deltaTime * 1000
+    bulletSegment.start.copy(bullet.mesh.position)
 
     // Update bullet position
-    bullet.mesh.position.add(bullet.velocity)
+    bullet.mesh.position.addScaledVector(bullet.velocity, deltaTime * 60)
+    bulletSegment.end.copy(bullet.mesh.position)
 
     // Update light position if it exists
     if (bullet.light) {
@@ -1175,13 +1180,15 @@ export function updateBullets(scene, zombies = []) {
         // Don't adjust height - check full 3D collision
         // _zombiePos.y = _bulletPos.y; // This line was limiting collision to a 2D plane
 
-        const distance = _bulletPos.distanceTo(_zombiePos)
+        bulletSegment.closestPointToPoint(_zombiePos, true, closestBulletPoint)
+        const distance = closestBulletPoint.distanceTo(_zombiePos)
 
         // Collision radius (combined size of bullet and zombie)
         const zombieRadius = 2.0
 
         if (distance < bulletRadius + zombieRadius) {
           hitZombie = true
+          document.dispatchEvent(new CustomEvent('bulletHit'))
 
           // Create impact effect at the hit position - reuse vectors
           // Adjust position slightly to be on zombie surface
@@ -1296,7 +1303,7 @@ export function updateBullets(scene, zombies = []) {
     bullet.trail.geometry.attributes.position.needsUpdate = true
 
     // Update distance traveled
-    const travelDistance = bullet.velocity.length()
+    const travelDistance = bullet.velocity.length() * deltaTime * 60
     bullet.distance += travelDistance
 
     // For piercing bullets, only remove if max pierce count reached or max distance exceeded
@@ -1306,7 +1313,7 @@ export function updateBullets(scene, zombies = []) {
     // Remove bullet if it's gone too far, too old, or hit a zombie (and can't pierce or reached max pierce)
     if (
       bullet.distance > bullet.maxDistance ||
-      currentTime - bullet.createdAt > BULLET_LIFE_TIME ||
+      bullet.age > BULLET_LIFE_TIME ||
       (hitZombie && (!bullet.canPierce || shouldRemovePiercingBullet))
     ) {
       scene.remove(bullet.mesh)
@@ -1321,9 +1328,10 @@ export function updateBullets(scene, zombies = []) {
   // Update remote player bullets (similar logic but no zombie collision)
   for (let i = remotePlayerBullets.length - 1; i >= 0; i--) {
     const bullet = remotePlayerBullets[i]
+    bullet.age = (bullet.age || 0) + deltaTime * 1000
 
     // Update bullet position
-    bullet.mesh.position.add(bullet.velocity)
+    bullet.mesh.position.addScaledVector(bullet.velocity, deltaTime * 60)
 
     // Update light position if it exists
     if (bullet.light) {
@@ -1348,13 +1356,13 @@ export function updateBullets(scene, zombies = []) {
     bullet.trail.geometry.attributes.position.needsUpdate = true
 
     // Update distance traveled
-    const travelDistance = bullet.velocity.length()
+    const travelDistance = bullet.velocity.length() * deltaTime * 60
     bullet.distance += travelDistance
 
     // Remote player bullets don't cause damage but should still be removed when too old or traveled too far
     if (
       bullet.distance > bullet.maxDistance ||
-      currentTime - bullet.createdAt > BULLET_LIFE_TIME
+      bullet.age > BULLET_LIFE_TIME
     ) {
       scene.remove(bullet.mesh)
       scene.remove(bullet.trail)
