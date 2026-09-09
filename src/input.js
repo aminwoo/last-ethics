@@ -45,6 +45,7 @@ function setInputDisabled(inputState, disabled) {
 // Set up keyboard event listeners
 function setupKeyboardListeners(inputState, callbacks) {
   window.addEventListener('keydown', (event) => {
+    if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable="true"]')) return
     // Skip input processing if disabled (except for inventory toggle)
     if (inputState.inputDisabled && event.key.toLowerCase() !== 'i') {
       return
@@ -56,6 +57,7 @@ function setupKeyboardListeners(inputState, callbacks) {
       return
     }
 
+    if (event.repeat) return
     switch (key) {
       case 'r':
         if (callbacks.onReload) callbacks.onReload()
@@ -121,6 +123,7 @@ function setupMouseListeners(inputState, callbacks) {
 
   // Add mouse down/up events for automatic weapons
   window.addEventListener('mousedown', (event) => {
+    if (event.button !== 0 || event.target.closest('button, input, .field-overlay')) return
     // Skip input processing if completely disabled or if inventory is open
     if (inputState.inputDisabled || inputState.inventoryModifier) {
       return

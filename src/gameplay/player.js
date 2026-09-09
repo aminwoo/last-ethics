@@ -445,8 +445,8 @@ function updatePlayerMovement(
   }
 
   // Update player position
-  player.position.x += moveX * speed
-  player.position.z += moveZ * speed
+  player.position.x += moveX * speed * deltaTime * 60
+  player.position.z += moveZ * speed * deltaTime * 60
 
   // Calculate direction from player to mouse position on ground
   raycaster.setFromCamera(input.mousePosition, flashlight.camera)

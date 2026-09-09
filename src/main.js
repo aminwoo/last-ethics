@@ -62,6 +62,7 @@ import { initializeChat } from './ui/chat.js'
 import { initializeInventory, toggleInventory } from './ui/inventory.js'
 // Import character classes
 import { getAllClasses, getClass } from './core/classes.js'
+import { initializeSurvival } from './ui/survival.js'
 
 // DOM elements
 const welcomeScreen = document.getElementById('welcome-screen')
@@ -76,6 +77,8 @@ const restartGameBtn = document.getElementById('restart-game-btn')
 // Flag to track if game is starting
 let isGameStarting = false
 let selectedClass = null
+let survival
+const pendingSpawns = []
 
 // Hide UI container and game over screen initially
 uiContainer.style.display = 'none'
@@ -178,23 +181,6 @@ async function initializeScene() {
   const ambientLight = new THREE.AmbientLight(0x101010) // Very dim ambient light
   scene.add(ambientLight)
 
-  // Create ground plane
-  const groundGeometry = new THREE.PlaneGeometry(500, 500)
-  const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.8,
-    metalness: 0.2,
-  })
-  const ground = new THREE.Mesh(groundGeometry, groundMaterial)
-  ground.rotation.x = -Math.PI / 2
-  ground.position.y = 0
-  ground.receiveShadow = true
-  scene.add(ground)
-
-  const gridHelper = new THREE.GridHelper(300, 300, 0x000000, 0x222222)
-  gridHelper.position.y = 0.0
-  scene.add(gridHelper)
-
   return {
     scene,
     camera,
@@ -213,12 +199,19 @@ function initializeClassSelection() {
   const classCards = document.querySelectorAll('.class-card')
 
   classCards.forEach((card) => {
+    card.tabIndex = 0
+    card.setAttribute('role', 'button')
+    card.setAttribute('aria-pressed', 'false')
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click() }
+    })
     card.addEventListener('click', () => {
       // Remove selected from all cards
-      classCards.forEach((c) => c.classList.remove('selected'))
+      classCards.forEach((c) => { c.classList.remove('selected'); c.setAttribute('aria-pressed', 'false') })
 
       // Add selected to clicked card
       card.classList.add('selected')
+      card.setAttribute('aria-pressed', 'true')
 
       // Store selected class
       selectedClass = card.dataset.class
@@ -236,6 +229,7 @@ function initializeClassSelection() {
 // Function to confirm class selection and start the game
 async function confirmClassSelection() {
   if (!selectedClass) return
+  confirmClassBtn.disabled = true
 
   // Set the player class
   setPlayerClass(selectedClass)
@@ -253,7 +247,7 @@ async function confirmClassSelection() {
       uiContainer.style.display = 'block'
 
       // Initialize and start the game
-      initializeGame()
+      return initializeGame()
     })
   }, 500)
 }
@@ -286,12 +280,10 @@ async function startGame() {
   // Store username in game state
   gameState.playerName = username
 
-  try {
-    // Initialize audio and play ambient sounds now that we have user interaction
-    await SoundManager.playRainAmbience()
-  } catch (error) {
+  // Audio loads in parallel; unavailable audio must not block deployment.
+  SoundManager.playRainAmbience().catch(() => {
     console.log('Audio initialization failed, continuing anyway')
-  }
+  })
 
   // Hide welcome screen with a fade-out effect
   welcomeScreen.style.opacity = '0'
@@ -321,59 +313,24 @@ async function startGame() {
 }
 
 // Function to display loading screen with progress bar
-function showLoadingScreen(onComplete) {
+async function showLoadingScreen(onComplete) {
   const loadingScreen = document.getElementById('loading-screen')
   const loadingBar = document.getElementById('loading-bar')
   const loadingText = document.getElementById('loading-text')
   loadingScreen.style.display = 'flex'
   loadingScreen.style.opacity = '1'
 
-  // Simulate loading progress
-  let progress = 0
-  const loadingMessages = [
-    'PREPARING YOUR ARSENAL...',
-    'CHARGING FLASHLIGHT BATTERIES...',
-    'SPAWNING ZOMBIES...',
-    'LOADING AMMUNITION...',
-    'SECURING THE PERIMETER...',
-    'CHECKING SURVIVAL PROTOCOLS...',
-  ]
-
-  const loadingInterval = setInterval(() => {
-    progress += Math.random() * 10
-    if (progress > 100) progress = 100
-
-    loadingBar.style.width = `${progress}%`
-
-    // Update loading message periodically
-    if (progress < 90) {
-      const messageIndex = Math.floor((progress / 90) * loadingMessages.length)
-      loadingText.textContent = loadingMessages[messageIndex]
-    } else {
-      loadingText.textContent = 'HERE COME THE HORDE!'
-    }
-
-    // When loading is complete
-    if (progress === 100) {
-      clearInterval(loadingInterval)
-
-      // Delay for a moment at 100% to show "READY TO DEPLOY!"
-      setTimeout(() => {
-        // Hide loading screen with a fade
-        loadingScreen.style.opacity = '0'
-        loadingScreen.style.transition = 'opacity 0.5s ease-out'
-
-        // Wait for fade to complete
-        setTimeout(() => {
-          loadingScreen.style.display = 'none'
-          // Call the completion callback
-          if (typeof onComplete === 'function') {
-            onComplete()
-          }
-        }, 500)
-      }, 800)
-    }
-  }, 200)
+  loadingBar.style.width = '15%'
+  loadingText.textContent = 'BUILDING THE PERIMETER...'
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  try {
+    await onComplete()
+    loadingBar.style.width = '100%'
+    loadingScreen.style.display = 'none'
+  } catch (error) {
+    console.error('Deployment failed:', error)
+    loadingText.textContent = 'DEPLOYMENT FAILED. REFRESH TO TRY AGAIN.'
+  }
 }
 
 // Full game initialization and start
@@ -389,6 +346,7 @@ async function initializeGame() {
 
   // Initialize input
   input = initializeInput()
+  survival = initializeSurvival(input)
 
   // Make three.js resources available globally for inventory system
   window.renderer = renderer
@@ -397,6 +355,9 @@ async function initializeGame() {
 
   // Initialize inventory system
   inventory = initializeInventory()
+  document.addEventListener('closeInventory', () => {
+    if (inventory.isOpen) toggleInventory(inventory, input)
+  })
 
   // Setup keyboard listeners
   setupKeyboardListeners(input, {
@@ -444,7 +405,7 @@ async function initializeGame() {
     },
     onInventoryToggle: () => {
       // Only allow inventory toggle if not typing in chat
-      if (!chat || !chat.isTyping()) {
+      if (!gameState.isPaused && !gameState.isGameOver && (!chat || !chat.isTyping())) {
         toggleInventory(inventory, input)
       }
     },
@@ -472,11 +433,11 @@ async function initializeGame() {
   window.getBulletModel = getBulletModel
   window.addRemoteBullet = addRemoteBullet
 
-  // Initialize multiplayer networking
-  try {
-    await initializeNetworking((playerCount) => {
+  // Optional multiplayer must never delay a solo deployment.
+  if (new URLSearchParams(window.location.search).has('multiplayer')) {
+    initializeNetworking((playerCount) => {
       updateMultiplayerStatus(playerCount)
-    }, scene)
+    }, scene).then(() => {
 
     // Make sendPlayerUpdate available globally for weapon firing updates
     window.sendPlayerUpdate = sendPlayerUpdate
@@ -488,9 +449,9 @@ async function initializeGame() {
 
     // Initialize chat after networking is set up
     chat = initializeChat()
-  } catch (error) {
+    }).catch((error) => {
     console.error('Failed to initialize networking:', error)
-    // Continue with single-player mode if networking fails
+    })
   }
 
   // Set up mouse listeners for crosshair and shooting
@@ -500,7 +461,7 @@ async function initializeGame() {
     },
     onMouseClick: () => {
       // Only allow shooting if not typing in chat
-      if (!chat || !chat.isTyping()) {
+      if (!gameState.isGameOver && !gameState.isPaused && (!chat || !chat.isTyping())) {
         handleShooting(input, player, scene, gameState)
       }
     },
@@ -513,29 +474,6 @@ async function initializeGame() {
   // Start the animation loop
   renderer.setAnimationLoop(animate)
 
-  // Add Z key for spawning zombies (for debugging/testing)
-  window.addEventListener('keydown', (event) => {
-    // Skip if typing in chat
-    if (chat && chat.isTyping()) return
-
-    // Z key to spawn more zombies around the player
-    if (event.key.toLowerCase() === 'z') {
-      const playerPosition = player.position.clone()
-      // Spawn zombies at a distance from the player in a random direction
-      const spawnDistance = 15
-      const spawnPosition = new THREE.Vector3(
-        playerPosition.x + (Math.random() * 2 - 1) * spawnDistance,
-        0,
-        playerPosition.z + (Math.random() * 2 - 1) * spawnDistance,
-      )
-
-      // Spawn 3-8 zombies
-      const zombieCount = Math.floor(Math.random() * 6) + 3
-      ZombieSystem.spawnZombieHorde(scene, spawnPosition, zombieCount, player)
-
-      console.log(`Spawned ${zombieCount} zombies at distance ${spawnDistance}`)
-    }
-  })
 }
 
 // Create UI elements for wave display
@@ -653,14 +591,7 @@ function handleWaveStart(event) {
         : zombiesPerGroup
 
     if (zombiesInThisGroup > 0) {
-      setTimeout(() => {
-        ZombieSystem.spawnZombieHorde(
-          scene,
-          position,
-          zombiesInThisGroup,
-          player,
-        )
-      }, index * 500) // Stagger spawning of groups
+      pendingSpawns.push({ position, count: zombiesInThisGroup, at: gameState.gameTime + index * .5 })
     }
   })
 }
@@ -678,6 +609,7 @@ function animate(time) {
   const deltaTime =
     lastTime === 0 ? 0 : Math.min(0.05, (time - lastTime) / 1000)
   lastTime = time
+  if (gameState.isPaused || gameState.isGameOver) return
 
   // Check if inventory is open - reduce update frequency for better performance
   const inventoryIsOpen = inventory && inventory.isOpen
@@ -699,6 +631,12 @@ function animate(time) {
 
   // Update game state regardless of inventory state
   updateGameState(deltaTime, input.keys)
+  for (let i = pendingSpawns.length - 1; i >= 0; i--) {
+    if (pendingSpawns[i].at <= gameState.gameTime) {
+      const spawn = pendingSpawns.splice(i, 1)[0]
+      ZombieSystem.spawnZombieHorde(scene, spawn.position, spawn.count, player)
+    }
+  }
 
   // Handle automatic weapon firing if mouse is held down (only if inventory is closed)
   if (
@@ -717,10 +655,12 @@ function animate(time) {
   const direction = updatePlayerAndFlashlight(deltaTime, inventoryIsOpen)
 
   // Update core game systems at reduced frequency when inventory is open
-  updateBullets(scene, ZombieSystem.getZombies())
+  updateBullets(scene, ZombieSystem.getZombies(), deltaTime)
+  if (gameState.isPaused) return
   updateScreenShake(camera)
   ZombieSystem.updateZombies(deltaTime)
   updateTurrets(deltaTime, scene, ZombieSystem.getZombies())
+  if (gameState.isPaused) return
 
   // Periodically cleanup dead zombies (less frequently)
   if (gameState.frameCount % 180 === 0) {
@@ -746,6 +686,7 @@ function animate(time) {
   if (gameState.frameCount % 3 === 0) {
     updateUI(ui, gameState)
     updateWaveUI()
+    survival.update()
   }
 
   // Update minimap even less frequently (every 5 frames)
@@ -856,6 +797,8 @@ function updateMultiplayerStatus(remotePlayerCount) {
 
 // Function to clean up resources when restarting or exiting the game
 function cleanupResources() {
+  pendingSpawns.length = 0
+  if (inventory.isOpen) toggleInventory(inventory, input)
   // Reset game state
   initializeGameState()
 
@@ -874,6 +817,7 @@ function cleanupResources() {
 
   // Reset player position
   player.position.set(0, 1, 0)
+  handleWeaponSwitch(player, 0, switchWeapon, gameState)
 
   // Reset player health and UI
   updateUI(ui, gameState)
@@ -886,6 +830,5 @@ function cleanupResources() {
     restartGameBtn.textContent = 'TRY AGAIN'
   }, 1000)
 
-  // Clean up networking resources
-  cleanupNetworking()
+  // Retain the existing connection across runs.
 }

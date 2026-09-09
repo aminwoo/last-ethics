@@ -4,6 +4,7 @@
   "description": "A top-down shooter game built with Three.js",
   "main": "src/main.js",
   "scripts": {
+    "test": "node --experimental-vm-modules --test tests/*.test.mjs",
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview"

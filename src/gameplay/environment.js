@@ -16,11 +16,11 @@ import {
 function createEnvironment(scene, camera) {
   // === LIGHTING SYSTEM ===
   // Cinematic ambient lighting with cold blue undertones
-  const ambientLight = new THREE.AmbientLight(0x1a2a3a, 0.35)
+  const ambientLight = new THREE.HemisphereLight(0x9aaea1, 0x252017, 0.8)
   scene.add(ambientLight)
 
   // Primary moon light - cold blue, creates main shadows
-  const moonLight = new THREE.DirectionalLight(0x4477aa, 0.6)
+  const moonLight = new THREE.DirectionalLight(0xa8c8bd, 1.1)
   moonLight.position.set(80, 120, 40)
   moonLight.castShadow = true
   moonLight.shadow.mapSize.width = 1024
@@ -61,7 +61,7 @@ function createEnvironment(scene, camera) {
 
   // Modern PBR ground material
   const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x0a0a0f,
+    color: 0x202720,
     roughness: 0.92,
     metalness: 0.08,
     envMapIntensity: 0.3,
@@ -75,10 +75,10 @@ function createEnvironment(scene, camera) {
   // Spawn platform - glowing safe zone indicator
   const spawnPlatformGeo = new THREE.CircleGeometry(20, 64)
   const spawnPlatformMat = new THREE.MeshStandardMaterial({
-    color: 0x0a1520,
+    color: 0x202a23,
     roughness: 0.7,
     metalness: 0.3,
-    emissive: 0x003344,
+    emissive: 0x29341d,
     emissiveIntensity: 0.15,
   })
   const spawnPlatform = new THREE.Mesh(spawnPlatformGeo, spawnPlatformMat)
@@ -90,7 +90,7 @@ function createEnvironment(scene, camera) {
   // Spawn ring decoration
   const spawnRingGeo = new THREE.RingGeometry(19.5, 20.5, 64)
   const spawnRingMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffaa,
+    color: 0xc7dc91,
     transparent: true,
     opacity: 0.4,
     side: THREE.DoubleSide,
@@ -102,15 +102,49 @@ function createEnvironment(scene, camera) {
 
   // === GRID SYSTEM ===
   // Subtle tech grid
-  const gridHelper = new THREE.GridHelper(400, 200, 0x00334466, 0x001122)
+  const gridHelper = new THREE.GridHelper(400, 100, 0x536346, 0x35432e)
   gridHelper.position.y = 0.01
   gridHelper.material.opacity = 0.25
   gridHelper.material.transparent = true
   scene.add(gridHelper)
 
   // === ATMOSPHERE ===
-  scene.fog = new THREE.FogExp2(0x050812, 0.007)
-  scene.background = new THREE.Color(0x020408)
+  scene.fog = new THREE.FogExp2(0x101911, 0.012)
+  scene.background = new THREE.Color(0x0b120c)
+
+  // Painted landing-zone markings and warm perimeter lamps anchor the arena.
+  const paint = new THREE.MeshBasicMaterial({ color: 0xb8bc8b, transparent: true, opacity: .35 })
+  const stripeGeometry = new THREE.PlaneGeometry(.3, 3)
+  for (let i = 0; i < 32; i++) {
+    const angle = i / 32 * Math.PI * 2
+    const stripe = new THREE.Mesh(stripeGeometry, paint)
+    stripe.rotation.set(-Math.PI / 2, 0, -angle)
+    stripe.position.set(Math.sin(angle) * 17, .04, Math.cos(angle) * 17)
+    scene.add(stripe)
+  }
+  const stencil = document.createElement('canvas')
+  stencil.width = 512
+  stencil.height = 256
+  const ctx = stencil.getContext('2d')
+  ctx.fillStyle = '#b8bc8b'
+  ctx.textAlign = 'center'
+  ctx.font = 'bold 100px monospace'
+  ctx.fillText('SECTOR 07', 256, 115)
+  ctx.font = '24px monospace'
+  ctx.fillText('H O L D  T H E  L I N E', 256, 170)
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(stencil), transparent: true, opacity: .28, depthWrite: false }))
+  sign.rotation.x = -Math.PI / 2
+  sign.position.set(0, .05, -6)
+  scene.add(sign)
+  for (let i = 0; i < 4; i++) {
+    const angle = Math.PI / 4 + i * Math.PI / 2
+    const lamp = new THREE.PointLight(0xef9b54, 18, 20, 2)
+    lamp.position.set(Math.cos(angle) * 18, 3, Math.sin(angle) * 18)
+    scene.add(lamp)
+    const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.15, .25, 1.4, 8), new THREE.MeshStandardMaterial({color: 0x525745, emissive: 0xef7745, emissiveIntensity: .6}))
+    beacon.position.set(lamp.position.x, .7, lamp.position.z)
+    scene.add(beacon)
+  }
 
   // === ENVIRONMENTAL PROPS ===
   // Scattered tech debris

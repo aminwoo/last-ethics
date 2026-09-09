@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import SoundManager from '../services/sound.js'
+import { gameState } from '../core/gameState.js'
 
 // Store all active turrets
 const turrets = []
@@ -12,9 +13,9 @@ const _bulletVelocity = new THREE.Vector3()
 const _targetOffset = new THREE.Vector3(0, 1, 0)
 
 // Constants for turret properties
-const TURRET_FIRE_RATE = 0.15 // seconds between shots
-const TURRET_RANGE = 30 // How far the turret can detect and shoot zombies
-const TURRET_DAMAGE = 35 // Damage per bullet
+const TURRET_FIRE_RATE = 0.45 // Supporting fire leaves room for player combat
+const TURRET_RANGE = 16
+const TURRET_DAMAGE = 18
 const TURRET_ROTATION_SPEED = 5.0 // How fast the turret can rotate
 const TURRET_BULLET_SPEED = 1.0 // Speed of turret bullets
 const TURRET_BULLET_LIFETIME = 1000 // milliseconds
@@ -244,7 +245,7 @@ export function createTurret(scene, position) {
     targetZombie: null,
     range: TURRET_RANGE,
     fireRate: TURRET_FIRE_RATE,
-    damage: TURRET_DAMAGE,
+    damage: TURRET_DAMAGE * (1 + (gameState.turretDamageBonus || 0)),
     rotationSpeed: TURRET_ROTATION_SPEED,
     ammo: Infinity, // Unlimited ammo for turrets
     active: true,
@@ -490,17 +491,17 @@ export function updateTurrets(deltaTime, scene, zombies) {
  * @param {number} deltaTime - Time since last frame
  */
 function updateTurretBullets(turret, scene, zombies, deltaTime) {
-  const currentTime = Date.now()
   const bulletsToRemove = []
   const velocityScale = deltaTime * 60
 
   // Update each bullet
   turret.bullets.forEach((bullet, index) => {
+    bullet.age = (bullet.age || 0) + deltaTime * 1000
     // Move bullet - avoid clone by using addScaledVector
     bullet.mesh.position.addScaledVector(bullet.velocity, velocityScale)
 
     // Check for lifetime expiration
-    if (currentTime - bullet.createdAt > TURRET_BULLET_LIFETIME) {
+    if (bullet.age > TURRET_BULLET_LIFETIME) {
       bulletsToRemove.push(index)
       return
     }
