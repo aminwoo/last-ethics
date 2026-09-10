@@ -1,15 +1,23 @@
 import * as THREE from 'three'
-import { attachPlayerVisual, createAnimationState, updatePlayerVisual } from './playerVisual.js'
+import {
+  attachPlayerVisual,
+  createAnimationState,
+  updatePlayerVisual,
+  survivorForClass,
+} from './playerVisual.js'
 
 // Player movement speed (base values, modified by class)
 const PLAYER_SPEED = 0.07
 const PLAYER_SPRINT_MULTIPLIER = 1.5
 
-function createPlayer() {
+// `survivor` names the authored outfit this actor wears; the character class
+// picks it for the local player and the peer id picks it for a remote one.
+function createPlayer(survivor) {
   const player = new THREE.Group()
   player.name = 'player' // Set a name to easily find the player object
 
   player.userData = {
+    survivor,
     animationTime: 0,
     isWalking: false,
     walkSpeed: 1,
@@ -42,7 +50,7 @@ function createPlayer() {
 
 // Initialize player with the current weapon
 function initializePlayer(scene, gameState) {
-  const playerObj = createPlayer()
+  const playerObj = createPlayer(survivorForClass(gameState.playerClass))
   scene.add(playerObj)
   return playerObj
 }

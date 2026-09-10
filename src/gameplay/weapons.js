@@ -117,6 +117,8 @@ function initBulletModel() {
 }
 
 // Constants for bullet system
+// Enemy rigs stand 2.4-3.4 units tall; their centre of mass is about here.
+const ZOMBIE_TORSO_HEIGHT = 1.3
 const BULLET_LIFE_TIME = 8000 // milliseconds - increased from 3000 to 8000
 const MUZZLE_FLASH_DURATION = 100 // milliseconds
 const SCREEN_SHAKE_DECAY = 0.9
@@ -1182,8 +1184,10 @@ export function updateBullets(scene, zombies = [], deltaTime = 1 / 60) {
 
         // Simple distance-based collision detection - reuse vectors
         _zombiePos.copy(zombie.position)
-        // Don't adjust height - check full 3D collision
-        // _zombiePos.y = _bulletPos.y; // This line was limiting collision to a 2D plane
+        // Aim the sphere at the torso, not the feet. Enemies are groups pinned
+        // to the ground while the survivor fires from chest height, so testing
+        // against the origin spent most of the radius on the vertical gap.
+        _zombiePos.y += ZOMBIE_TORSO_HEIGHT
 
         bulletSegment.closestPointToPoint(_zombiePos, true, closestBulletPoint)
         const distance = closestBulletPoint.distanceTo(_zombiePos)

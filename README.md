@@ -181,20 +181,24 @@ This guide explains how to test the different zombie types in the game.
 
 ### Available Zombie Types
 
-The game features three distinct zombie types, each with a unique model and behaviors:
+The game features four distinct enemy types, each with its own authored Quaternius rig and behaviour (see `docs/enemy-animation.md`):
 
 1. **REGULAR**: Standard zombies with balanced stats
-   - Appearance: Basic zombie with glowing red eyes
+   - Appearance: green zombie in blue trousers
    - Medium speed, health, and damage
 
 2. **RUNNER**: Fast zombies that can chase you quickly
-   - Appearance: Leaner with yellow-orange eyes, elongated head, longer limbs
-   - Wears athletic clothing
+   - Appearance: ochre mutant with one oversized arm and a hunched run
    - Higher speed, lower health, medium damage
 
 3. **BRUTE**: Heavy zombies that hit hard
-   - Appearance: Bulkier with dark red eyes, armor pieces, and spikes
+   - Appearance: broad purple zombie with an exposed tongue
    - Lower speed, higher health, higher damage
+
+4. **DOG**: Infected shepherds that reach you first
+   - Appearance: brown quadruped that bites rather than punches
+   - Highest speed, lowest health, rapid low-damage attacks
+   - Joins the horde from wave 3
 
 ### Testing Keys
 

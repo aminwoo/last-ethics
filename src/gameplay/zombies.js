@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { attachCharacterSprite, updateCharacterSprite, disposeCharacterSprite } from './sprites.js'
+import { attachZombieVisual, updateZombieVisual, disposeZombieVisual, ZOMBIE_DEATH_DURATION } from './zombieVisual.js'
 import {
   recordZombieKill,
   gameState,
@@ -10,6 +10,7 @@ import {
 } from '../core/gameState.js'
 import SoundManager from '../services/sound.js'
 import { showDamageFlash, createDeathEffect } from './effects.js'
+import { spawnBloodDecal } from './props.js'
 
 // Zombie types with different characteristics
 const ZOMBIE_TYPES = {
@@ -40,7 +41,19 @@ const ZOMBIE_TYPES = {
     attackSpeed: 0.7, // Slower attacks
     size: { width: 1.2, height: 2.2, depth: 0.8 },
   },
+  DOG: {
+    speed: 0.09, // Fastest enemy: closes the distance before you can reposition
+    health: 45, // ...but folds to a single solid hit
+    damage: 12,
+    color: 0x8a5a2b, // Shepherd brown
+    attackRange: 1.3,
+    attackSpeed: 1.8, // Rapid bites
+    size: { width: 0.6, height: 1.0, depth: 1.4 },
+  },
 }
+
+// Blood splash sizes, relative to the authored decal
+const BLOOD_SIZE = { BRUTE: 1.5, DOG: 0.7, RUNNER: 0.9 }
 
 // Store all zombies
 const zombies = []
@@ -82,6 +95,7 @@ export function createZombie(scene, position, type = 'REGULAR', playerRef) {
     attackSpeed: zombieType.attackSpeed,
     lastAttackTime: 0,
     isAttacking: false,
+    attackSequence: 0,
     isDying: false,
     isDead: false,
     isMoving: true,
@@ -93,7 +107,7 @@ export function createZombie(scene, position, type = 'REGULAR', playerRef) {
     knockback: {
       velocity: new THREE.Vector3(0, 0, 0),
       active: false,
-      decayRate: type === 'BRUTE' ? 0.85 : type === 'RUNNER' ? 0.9 : 0.88, // Different decay rates for different zombie types
+      decayRate: type === 'BRUTE' ? 0.85 : type === 'RUNNER' ? 0.9 : type === 'DOG' ? 0.92 : 0.88, // Different decay rates for different zombie types
     },
     // Increase collision radius for more effective separation
     radius: Math.max(zombieType.size.width, zombieType.size.depth) * 0.8, // Larger radius for collision
@@ -115,7 +129,7 @@ export function createZombie(scene, position, type = 'REGULAR', playerRef) {
     },
   }
 
-  attachCharacterSprite(zombie, type, type === 'BRUTE' ? 3.4 : type === 'RUNNER' ? 2.2 : 2.7)
+  zombie.userData.visualReady = attachZombieVisual(zombie)
 
   // Add to scene and zombies array
   scene.add(zombie)
@@ -138,16 +152,22 @@ export function updateZombies(deltaTime) {
 
     // Update death animation
     if (userData.isDying) {
+      if (!userData.bled) {
+        userData.bled = true
+        // A kill marks the ground. The decal pool recycles, so the arena
+        // accumulates evidence of the fight without growing without bound.
+        spawnBloodDecal(zombie.position, BLOOD_SIZE[userData.zombieType] || 1)
+      }
       userData.animationTime += deltaTime
 
       // Play death animation for 1.5 seconds
-      if (userData.animationTime <= 1.5) {
-        updateCharacterSprite(zombie, userData.animationTime, 'dying', userData.animationTime / 1.5)
+      if (userData.animationTime <= ZOMBIE_DEATH_DURATION) {
+        updateZombieVisual(zombie, deltaTime)
       } else {
         // Mark as fully dead after animation completes
-        updateCharacterSprite(zombie, userData.animationTime, 'dying', 1)
         userData.isDead = true
         userData.isDying = false
+        updateZombieVisual(zombie, deltaTime)
 
         // Create death particle effect
         if (zombie.parent) {
@@ -267,6 +287,7 @@ export function updateZombies(deltaTime) {
 
         // Set animation state to walking
         if (userData.animationState !== 'walking') {
+          userData.isAttacking = false
           userData.animationState = 'walking'
           userData.animationTime = 0
         }
@@ -279,24 +300,29 @@ export function updateZombies(deltaTime) {
           // Perform attack
           userData.lastAttackTime = currentTime
           userData.isAttacking = true
+          userData.attackSequence++
           userData.animationState = 'attacking'
           userData.animationTime = 0
 
           // Apply damage to player
           damagePlayer(userData.targetPlayer, userData.damage)
+        } else if (!userData.isAttacking) {
+          userData.animationState = 'idle'
         }
       }
+    } else if (userData.animationState === 'walking') {
+      userData.animationState = 'idle'
     }
 
     // Update animations based on state
     userData.animationTime += deltaTime
 
-    if (userData.animationState === 'attacking' && userData.animationTime > 1) {
+    if (userData.animationState === 'attacking' && userData.animationTime >= Math.min(0.8, 1 / userData.attackSpeed)) {
       userData.isAttacking = false
       userData.animationState = 'idle'
       userData.animationTime = 0
     }
-    updateCharacterSprite(zombie, userData.animationTime, userData.animationState)
+    updateZombieVisual(zombie, deltaTime)
   }
 }
 
@@ -369,45 +395,37 @@ function calculateZombieSeparation(zombie, currentIndex) {
     }
   }
 
-  // Only check obstacles if we haven't used up all our separation budget on zombies
-  if (zombiesChecked < maxZombiesToCheck && window.environmentObstacles) {
-    const obstacles = window.environmentObstacles
-    const maxObstaclesToCheck = Math.min(
-      obstacles.length,
-      maxZombiesToCheck - zombiesChecked,
-    )
+  // Every obstacle is tested, cheaply. The town scatters wrecks, containers and
+  // barricades all over the arena, so scanning a fixed slice of the array by
+  // index would steer the horde around whichever props happened to load first.
+  if (window.environmentObstacles) {
+    const zombieRadius = zombie.userData.radius || 0.5
 
-    for (let i = 0; i < maxObstaclesToCheck; i++) {
-      const obstacle = obstacles[i]
+    for (const obstacle of window.environmentObstacles) {
+      if (!obstacle.userData || obstacle.userData.type !== 'obstacle') continue
 
-      if (obstacle.userData && obstacle.userData.type === 'obstacle') {
-        const distance = zombie.position.distanceTo(obstacle.position)
+      // Minimum distance to maintain
+      const minDistance = (obstacle.userData.radius || 1.5) + zombieRadius + 0.5
+      const distanceSquared = zombie.position.distanceToSquared(obstacle.position)
 
-        // Get obstacle radius or use default
-        const obstacleRadius = obstacle.userData.radius || 1.5
-        const zombieRadius = zombie.userData.radius || 0.5
+      // Squared compare first: most of the town is nowhere near this zombie
+      if (distanceSquared >= minDistance * minDistance) continue
+      const distance = Math.sqrt(distanceSquared)
 
-        // Calculate minimum distance to maintain
-        const minDistance = obstacleRadius + zombieRadius + 0.5 // Reduced from 0.8 to 0.5
+      // Direction away from the obstacle - reuse temp vector
+      _tempAway.subVectors(zombie.position, obstacle.position).normalize()
 
-        // If zombie is too close to obstacle
-        if (distance < minDistance) {
-          // Direction away from the obstacle - reuse temp vector
-          _tempAway.subVectors(zombie.position, obstacle.position).normalize()
+      // Force is stronger the closer they are (exponential)
+      const forceMagnitude =
+        Math.pow((minDistance - distance) / minDistance, 1.5) * 1.2
 
-          // Force is stronger the closer they are (exponential)
-          const forceMagnitude =
-            Math.pow((minDistance - distance) / minDistance, 1.5) * 1.2
+      // Scale by zombie speed
+      const forceStrength = zombie.userData.speed * 1.0 * forceMagnitude
 
-          // Scale by zombie speed
-          const forceStrength = zombie.userData.speed * 1.0 * forceMagnitude
-
-          // Add to total separation force
-          _tempSeparation.x += _tempAway.x * forceStrength
-          _tempSeparation.y += _tempAway.y * forceStrength
-          _tempSeparation.z += _tempAway.z * forceStrength
-        }
-      }
+      // Add to total separation force
+      _tempSeparation.x += _tempAway.x * forceStrength
+      _tempSeparation.y += _tempAway.y * forceStrength
+      _tempSeparation.z += _tempAway.z * forceStrength
     }
   }
 
@@ -720,7 +738,7 @@ export function cleanupDeadZombies(scene, delay = 10000) {
 
       if (currentTime - zombie.userData.deathTime > delay) {
         // Remove from scene and array
-        disposeCharacterSprite(zombie)
+        disposeZombieVisual(zombie)
         scene.remove(zombie)
         zombies.splice(i, 1)
       }
