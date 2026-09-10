@@ -833,3 +833,333 @@ body {
   }
 }
 
+
+/* === DEPLOYMENT SCREEN: specialist, then survivor ===
+   Sized against the viewport rather than the content, so the whole console
+   fits on a 720p screen and never produces a scrollbar. */
+#class-selection-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(10px,2.6vh,30px) clamp(14px,3vw,40px)
+}
+.class-selection-content {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px,1.6vh,18px);
+  width: 100%;
+  max-width: 1180px;
+  height: 100%;
+  /* Past this the console stops stretching and the cards keep their density. */
+  max-height: 860px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left
+}
+.deploy-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: clamp(6px,1.2vh,14px);
+  border-bottom: 1px solid #76866144
+}
+.deploy-heading .eyebrow {
+  margin-bottom: clamp(4px,.8vh,10px)
+}
+.class-selection-content h1 {
+  font-size: clamp(26px,4.4vh,48px);
+  line-height: 1
+}
+.deploy-callsign {
+  flex: none;
+  text-align: right
+}
+.deploy-callsign span {
+  font: 9px 'IBM Plex Mono',monospace;
+  letter-spacing: 1.5px;
+  color: var(--muted)
+}
+.class-selection-content h2 {
+  margin: 3px 0 0;
+  font: 600 clamp(15px,2.2vh,20px)/1 'Barlow Condensed',sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase
+}
+.deploy-step {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px,1.2vh,12px);
+  min-height: 0
+}
+.deploy-step-class {
+  flex: 1 1 auto
+}
+.deploy-step-survivor {
+  flex: none
+}
+.step-label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font: 600 clamp(13px,1.9vh,17px)/1 'Barlow Condensed',sans-serif;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--paper)
+}
+.step-label span {
+  font: 600 9px 'IBM Plex Mono',monospace;
+  letter-spacing: 1px;
+  color: #1a2215;
+  background: var(--acid);
+  padding: 3px 6px
+}
+.step-label em {
+  font: 400 10px 'IBM Plex Mono',monospace;
+  font-style: normal;
+  letter-spacing: .5px;
+  color: var(--muted)
+}
+
+/* Specialist cards: one row for the badge and name, then the numbers. */
+.class-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: clamp(8px,1.4vh,14px);
+  margin: 0
+}
+.class-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'icon name' 'desc desc' 'stats stats' 'abilities abilities';
+  /* Cards stretch to their grid row: the detail stays grouped at the top and
+     the last row absorbs the slack, pinning the perks to the bottom edge. */
+  grid-template-rows: auto auto auto 1fr;
+  overflow: hidden;
+  padding: clamp(9px,1.5vh,16px) clamp(10px,1.1vw,16px);
+  text-align: left
+}
+.class-icon {
+  grid-area: icon;
+  align-self: center;
+  margin: 0 10px 0 0;
+  font-size: clamp(18px,2.6vh,26px);
+  line-height: 1
+}
+.class-name {
+  grid-area: name;
+  align-self: center;
+  margin: 0;
+  font-size: clamp(17px,2.6vh,24px);
+  letter-spacing: 1.5px;
+  line-height: 1.1
+}
+.class-description {
+  grid-area: desc;
+  margin: clamp(5px,1vh,9px) 0 0;
+  min-height: 0;
+  font-size: clamp(9px,1.35vh,11px);
+  line-height: 1.35
+}
+.class-stats {
+  grid-area: stats;
+  margin: clamp(6px,1.1vh,10px) 0 0
+}
+.class-stats .stat-row {
+  margin-bottom: clamp(3px,.6vh,6px);
+  font-size: clamp(8px,1.15vh,10px)
+}
+.class-stats .stat-row span {
+  width: 52px
+}
+.class-stats .stat-bar {
+  height: 5px;
+  margin-left: 8px
+}
+.class-abilities {
+  grid-area: abilities;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-self: end;
+  margin: clamp(6px,1.1vh,10px) 0 0;
+  padding-top: clamp(5px,1vh,9px)
+}
+.ability {
+  margin: 0;
+  padding: 3px 7px;
+  line-height: 1.2
+}
+
+/* Survivor roster: the four authored outfits, cosmetic only. */
+.survivor-grid {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: clamp(8px,1.4vh,14px)
+}
+.survivor-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'portrait name' 'portrait tag';
+  align-content: center;
+  column-gap: clamp(8px,1vw,14px);
+  padding: clamp(5px,.9vh,9px) clamp(10px,1vw,14px);
+  background: #1b231b;
+  border: 1px solid #76866144;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: transform .2s,border-color .2s,background .2s
+}
+.survivor-card img {
+  grid-area: portrait;
+  align-self: end;
+  display: block;
+  width: auto;
+  height: clamp(58px,13.5vh,124px);
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
+  transition: transform .2s
+}
+.survivor-name {
+  grid-area: name;
+  align-self: end;
+  font: 600 clamp(16px,2.4vh,22px)/1 'Barlow Condensed',sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--paper)
+}
+.survivor-tag {
+  grid-area: tag;
+  align-self: start;
+  margin-top: 4px;
+  font: 10px 'IBM Plex Mono',monospace;
+  color: var(--muted)
+}
+.survivor-card:hover {
+  background: #283222;
+  border-color: #9daa80;
+  transform: translateY(-3px)
+}
+.survivor-card:hover img {
+  transform: scale(1.06)
+}
+.survivor-card:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 5px
+}
+.survivor-card.selected {
+  background: #2d3826;
+  border-color: var(--acid);
+  box-shadow: inset 0 3px var(--acid)
+}
+.survivor-card.selected .survivor-name {
+  color: var(--acid)
+}
+.survivor-card.selected:after {
+  content: 'SELECTED';
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--acid)
+}
+#confirm-class-btn {
+  align-self: stretch;
+  margin: 0;
+  padding: clamp(11px,1.8vh,16px) 32px;
+  border-radius: 2px;
+  font-size: clamp(13px,1.9vh,16px)
+}
+
+/* The base stylesheet drops the specialists to two columns at 900px, which
+   costs a whole extra row of height. These cards are compact enough to stay
+   three across until the window is genuinely narrow. */
+@media (min-width: 700px) {
+  .class-grid {
+    grid-template-columns: repeat(3,1fr)
+  }
+}
+@media (max-width: 900px) {
+  /* Two specialist columns means three rows; the cards give up their blurb
+     and the roster its one-liners so nothing has to be clipped. */
+  .class-card {
+    padding: clamp(8px,1.2vh,12px) 12px
+  }
+  .class-description {
+    display: none
+  }
+  .class-stats .stat-row {
+    margin-bottom: 3px
+  }
+  .class-abilities {
+    margin-top: 5px;
+    padding-top: 5px
+  }
+  .survivor-card img {
+    height: clamp(50px,8.4vh,78px)
+  }
+  .survivor-card {
+    grid-template-areas: 'portrait name';
+    grid-template-rows: auto;
+    align-items: center;
+    column-gap: 8px;
+    padding-left: 8px;
+    padding-right: 8px
+  }
+  .survivor-card img,
+  .survivor-name {
+    align-self: center
+  }
+  .survivor-tag {
+    display: none
+  }
+}
+
+/* Phone widths: two roster rows and three specialist rows stop fitting, so the
+   console scrolls here rather than cropping a card. */
+@media (max-width: 640px) {
+  #class-selection-screen {
+    align-items: flex-start;
+    overflow: auto
+  }
+  .class-selection-content {
+    height: auto;
+    max-height: none;
+    overflow: visible
+  }
+  .survivor-grid {
+    grid-template-columns: repeat(2,1fr)
+  }
+  .survivor-card img {
+    height: clamp(46px,7.5vh,72px)
+  }
+}
+
+/* Short screens: drop the blurbs and shrink the roster to buy back the rows,
+   and let the console scroll if even that is not enough. */
+@media (max-height: 620px) {
+  #class-selection-screen {
+    align-items: flex-start;
+    overflow: auto
+  }
+  .class-description {
+    display: none
+  }
+  .class-stats .stat-row {
+    margin-bottom: 3px
+  }
+  .survivor-card img {
+    height: 54px
+  }
+  .class-selection-content {
+    /* Grow to the content instead of the viewport, so the screen scrolls
+       rather than the cards clipping. */
+    height: auto;
+    max-height: none;
+    overflow: visible
+  }
+}

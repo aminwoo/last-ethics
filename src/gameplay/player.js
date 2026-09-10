@@ -50,7 +50,8 @@ function createPlayer(survivor) {
 
 // Initialize player with the current weapon
 function initializePlayer(scene, gameState) {
-  const playerObj = createPlayer(survivorForClass(gameState.playerClass))
+  // The player's own pick wins; the class only supplies the default.
+  const playerObj = createPlayer(gameState.playerSurvivor || survivorForClass(gameState.playerClass))
   scene.add(playerObj)
   return playerObj
 }
