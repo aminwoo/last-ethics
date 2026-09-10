@@ -1,21 +1,45 @@
 # Animated player
 
-The four-view player billboard has been replaced with the repository's existing `public/models/Male Survivor 2 .glb`. This is an authored mesh, skeleton, texture and animation asset, not a character assembled from code geometry. The model rotates continuously with the existing mouse-aim heading.
+The player is one of the Quaternius Zombie Apocalypse Kit's four authored survivors, so the survivor, the enemies and the town are all one art style. Provenance is in `public/models/survivors/README.md`. These are authored meshes, skeletons, textures and animation clips, not characters assembled from code geometry. The model rotates continuously with the existing mouse-aim heading.
 
-`src/gameplay/playerVisual.js` loads and caches the asset, clones its skeleton per player, and maps its generically named Blender clips after visual inspection:
-
-| Source clip | Use |
+| Class | Survivor |
 | --- | --- |
-| NlaTrack | Idle legs; lowered upper-body pose during reload |
-| NlaTrack.001 | Walking legs |
-| NlaTrack.002 | Running legs |
-| NlaTrack.003 | Aiming upper body |
-| NlaTrack.004 | Firing upper body |
+| Soldier | Matt |
+| Heavy, Engineer | Sam |
+| Scout, Assassin | Shaun |
+| Medic | Lis |
 
-Leg and upper-body tracks are disjoint and blend over 120 ms. Running and walking continue while firing or reloading. Each successful shot restarts the firing action and adds a short recoil impulse to the weapon, hands and torso. Reloading blends down to the lowered weapon pose and adds a magazine-reaching hand motion. Reload is a layered animation built on the source poses, not a dedicated imported reload clip. Empty clicks and rejected shots do not trigger firing animation.
+Six classes share four outfits rather than wearing tinted copies of one: the kit's texture is a palette atlas and takes tinting badly. Multiplayer carries no class over the wire, so remote survivors are spread across the four outfits by a hash of the peer id — four distinct people rather than four copies of the same one. Only the survivors a session needs are fetched.
 
-Muzzle anchors follow the animated weapon bone, so bullets and flashes originate at the rig's barrel. Reload completion and weapon switching cancel the corresponding action. Animation uses simulation time and pauses with gameplay. The loading screen waits for the local model, and each remote player receives an independent mixer and cloned skeleton.
+`src/gameplay/playerVisual.js` loads and caches each asset, clones its skeleton per player, and splits the kit's named clips into two layers by bone:
 
-The source model depicts one outfit with its bundled rifle; weapon and class selection still change gameplay and HUD rather than the mesh. Enemy sprites and environment art remain as described in `sprite-art.md`.
+| Layer | Bones | Clips |
+| --- | --- | --- |
+| Lower | `Root`, `Body`, `Hips`, legs, feet, IK pole targets | `Idle_Gun`, `Walk_Gun`, `Run_Gun` |
+| Upper | everything above the hips | `Idle_Gun` to aim, `Idle` as the lowered-weapon reload pose |
 
-Validation includes the production build, existing survival/sprite tests, tests that parse the actual survivor rig and clips (omitting only image decoding in Node), and browser checks of running/firing/reloading at non-cardinal headings. Repeated zero-time updates verify that procedural offsets never accumulate on constant animation tracks.
+The two never overlap, so firing cannot stop the walking cycle and a stride never disturbs the aim. Locomotion uses the kit's `_Gun` variants because their legs were authored against this upper body. Layers blend over 120 ms.
+
+The kit has no firing clip, so a shot is recoil: each accepted shot adds a short impulse to the weapon hand, both forearms and the torso, and every accepted shot restarts it, even while already firing. Reload blends the upper body down to the unarmed idle and adds a magazine-fetching motion with the free hand. Both are additive offsets over the authored pose, applied after restoring it, so they never accumulate on constant tracks. Empty clicks and rejected shots trigger nothing.
+
+## Weapons
+
+Each survivor file carries all ten kit weapon meshes parented to the rig's left hand. The equipped weapon is whichever anchor `weapons.js` has made visible — already the game's source of truth — so the mesh follows it with no new plumbing and no protocol change:
+
+| Anchor | Mesh |
+| --- | --- |
+| `pistol` | `Pistol` |
+| `shotgun` | `Shotgun` |
+| `assaultRifle` | `SMG` |
+| `sniperRifle` | `Rifle` |
+| `bat` | `WoodenBat_Barbed` |
+
+Every weapon gets a muzzle anchor at the forward tip of its own geometry, so bullets, muzzle flashes and the barrel the HUD reads all originate at the barrel of the mesh actually in the survivor's hand. That barrel sits higher than the previous rig's did, which exposed a latent problem in `weapons.js`: bullets were tested against a sphere on the enemy's *origin*, at its feet, so most of the hit radius was spent on the vertical gap and the tallest weapons would have shot clean over the horde. The sphere is now centred on the torso. `tests/playerVisual.test.mjs` asserts that every equipped weapon keeps a usable horizontal hit radius.
+
+## Sizing
+
+`Box3` ignores skinning, so measuring a rig that way reports its bind pose: arms out, spear included. Survivors are sized from posed bounds computed off their own bone matrices, over the skinned body only, which is what makes 2.8 units mean the same thing for all four.
+
+## Validation
+
+Production build, the survival regression tests, and tests that parse the real rigs, clips and weapon meshes (omitting only image decoding, which Node has no decoder for): each class's survivor stands 2.8 units with its feet on the ground, legs and upper body run independently through firing and reloading, repeated zero-time updates never accumulate procedural offsets, each anchor shows exactly its own weapon and every barrel tracks that mesh's muzzle, clones stay independent, and removal during loading cannot attach a ghost survivor after a restart. Checked in the running game in a browser: the soldier, scout, heavy and medic outfits each deploy and stand on the asphalt, and the held mesh changes with the equipped weapon.

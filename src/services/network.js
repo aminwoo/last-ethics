@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import { createPlayer, animatePlayerLegs } from '../gameplay/player.js'
-import { disposePlayerVisual, triggerPlayerShot } from '../gameplay/playerVisual.js'
+import { disposePlayerVisual, triggerPlayerShot, survivorForId } from '../gameplay/playerVisual.js'
 import SoundManager from './sound.js'
 
 // WebSocket connection and player tracking
@@ -547,7 +547,7 @@ function addRemotePlayer(playerData, scene) {
   )
 
   // Use the same player model creation function as the main player
-  const remotePlayer = createPlayer()
+  const remotePlayer = createPlayer(survivorForId(playerData.id))
   remotePlayer.userData.visualReady.catch(error => console.error('Remote survivor could not load:', error))
   remotePlayer.name = `remote-player-${playerData.id}`
 

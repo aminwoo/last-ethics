@@ -41,7 +41,7 @@ import {
   addRemoteBullet,
 } from './gameplay/weapons.js'
 import * as ZombieSystem from './gameplay/zombies.js'
-import { disposeCharacterSprite } from './gameplay/sprites.js'
+import { disposeZombieVisual, preloadZombieVisuals } from './gameplay/zombieVisual.js'
 // Import turret functionality
 import {
   createSpawnTurrets,
@@ -416,15 +416,20 @@ async function initializeGame() {
   // Create environment
   environment = createEnvironment(scene, camera)
 
-  // Make obstacles available globally for zombie collision detection
-  window.environmentObstacles = environment.obstacles || []
-
   // Make scene globally available for network code
   window.gameScene = scene
 
   // Create player
   player = initializePlayer(scene, gameState)
-  await player.userData.visualReady
+  // Deployment waits for the town, the survivor and every enemy rig together.
+  const [town] = await Promise.all([
+    environment.town,
+    player.userData.visualReady,
+    preloadZombieVisuals(),
+  ])
+
+  // Wrecks, containers and barricades are what the horde steers around.
+  window.environmentObstacles = town.obstacles
 
   // Create turrets at player spawn position
   turrets = createSpawnTurrets(scene, player.position)
@@ -819,7 +824,7 @@ function cleanupResources() {
   // Clear existing zombies
   while (ZombieSystem.getZombies().length > 0) {
     const zombie = ZombieSystem.getZombies()[0]
-    disposeCharacterSprite(zombie)
+    disposeZombieVisual(zombie)
     scene.remove(zombie)
     ZombieSystem.getZombies().splice(0, 1)
   }

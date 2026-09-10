@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { createGroundTexture, createPropSprite } from './sprites.js'
+import { createGroundTexture } from './sprites.js'
+import { buildTown, TOWN_RADIUS } from './props.js'
 import {
   RAIN_COUNT,
   RAIN_AREA_SIZE,
@@ -51,10 +52,12 @@ function createEnvironment(scene, camera) {
     const z = positions[i + 1]
     const distFromCenter = Math.sqrt(x * x + z * z)
 
-    // Create gentle rolling hills outside spawn
-    if (distFromCenter > 25) {
+    // Rolling hills only beyond the town: the streets and their props are flat
+    // slabs, so any displacement under them would show as clipping.
+    if (distFromCenter > TOWN_RADIUS) {
+      const rise = Math.min(1, (distFromCenter - TOWN_RADIUS) / 40)
       const noise = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5
-      positions[i + 2] = noise + (Math.random() - 0.5) * 0.15
+      positions[i + 2] = (noise + (Math.random() - 0.5) * 0.15) * rise
     }
   }
   groundGeometry.computeVertexNormals()
@@ -114,24 +117,9 @@ function createEnvironment(scene, camera) {
   sign.rotation.x = -Math.PI / 2
   sign.position.set(0, .05, -6)
   scene.add(sign)
-  for (let i = 0; i < 4; i++) {
-    const angle = Math.PI / 4 + i * Math.PI / 2
-    const lamp = new THREE.PointLight(0xef9b54, 18, 20, 2)
-    lamp.position.set(Math.cos(angle) * 18, 3, Math.sin(angle) * 18)
-    scene.add(lamp)
-    const beacon = new THREE.Mesh(new THREE.CylinderGeometry(.15, .25, 1.4, 8), new THREE.MeshStandardMaterial({color: 0x525745, emissive: 0xef7745, emissiveIntensity: .6}))
-    beacon.position.set(lamp.position.x, .7, lamp.position.z)
-    scene.add(beacon)
-  }
-
-  // Painted props form small supply stations outside the central fighting lane.
-  for (let i = 0; i < 28; i++) {
-    const angle = i * 2.399963
-    const radius = i < 12 ? 15 + (i % 3) * 3 : 30 + (i % 7) * 6
-    const prop = createPropSprite(i % 4, i % 4 === 0 ? 5 : 3.8)
-    prop.position.set(Math.cos(angle) * radius, 0.08, Math.sin(angle) * radius)
-    scene.add(prop)
-  }
+  // The four landing-zone lamps are authored street lights now; props.js places
+  // them, along with the streets, wrecks and barricades of the surrounding town.
+  const town = buildTown(scene)
 
   // Arena boundary markers (glowing pylons)
   const pylonGeo = new THREE.CylinderGeometry(0.3, 0.5, 4, 8)
@@ -174,6 +162,7 @@ function createEnvironment(scene, camera) {
   const thunder = createThunderEffect(scene)
 
   return {
+    town,
     ground,
     ambientLight,
     moonLight,

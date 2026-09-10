@@ -14,6 +14,7 @@ export const SCORE_VALUES = {
   REGULAR: 100,
   RUNNER: 150,
   BRUTE: 250,
+  DOG: 175,
 }
 
 // Wave settings - zombies per wave increases with each wave
@@ -35,39 +36,39 @@ export const WAVE_SETTINGS = {
 
   // Wave composition (percentage of different zombie atypes)
   composition: [
-    // Wave 1-3: Mostly regular zombies, few runners
-    { REGULAR: 1.0, RUNNER: 0.0, BRUTE: 0.0 }, // Wave 1: 100% Regular zombies
-    { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0.0 }, // Wave 2: Introduce runners
-    { REGULAR: 0.8, RUNNER: 0.2, BRUTE: 0.0 }, // Wave 3
+    // Wave 1-3: Mostly regular zombies, then runners and the first dogs
+    { REGULAR: 1.0, RUNNER: 0.0, BRUTE: 0.0, DOG: 0.0 }, // Wave 1: 100% Regular zombies
+    { REGULAR: 0.85, RUNNER: 0.15, BRUTE: 0.0, DOG: 0.0 }, // Wave 2: Introduce runners
+    { REGULAR: 0.75, RUNNER: 0.15, BRUTE: 0.0, DOG: 0.1 }, // Wave 3: Introduce dogs
 
     // Wave 4-6: Gradually increase runners, still mostly regulars
-    { REGULAR: 0.75, RUNNER: 0.15, BRUTE: 0.1 }, // Wave 4: Introduce brutes
-    { REGULAR: 0.7, RUNNER: 0.2, BRUTE: 0.1 }, // Wave 5
-    { REGULAR: 0.65, RUNNER: 0.25, BRUTE: 0.1 }, // Wave 6
+    { REGULAR: 0.65, RUNNER: 0.15, BRUTE: 0.1, DOG: 0.1 }, // Wave 4: Introduce brutes
+    { REGULAR: 0.6, RUNNER: 0.2, BRUTE: 0.1, DOG: 0.1 }, // Wave 5
+    { REGULAR: 0.55, RUNNER: 0.25, BRUTE: 0.1, DOG: 0.1 }, // Wave 6
 
-    // Wave 7-9: Introduce brutes, reduce regulars further
-    { REGULAR: 0.7, RUNNER: 0.25, BRUTE: 0.05 }, // Wave 7: Introduce small number of Brutes
-    { REGULAR: 0.65, RUNNER: 0.3, BRUTE: 0.05 }, // Wave 8: Increase Runners slightly
-    { REGULAR: 0.6, RUNNER: 0.3, BRUTE: 0.1 }, // Wave 9: Increase Brutes slightly
+    // Wave 7-9: Reduce regulars further, dogs come in packs
+    { REGULAR: 0.58, RUNNER: 0.25, BRUTE: 0.05, DOG: 0.12 }, // Wave 7
+    { REGULAR: 0.53, RUNNER: 0.3, BRUTE: 0.05, DOG: 0.12 }, // Wave 8: Increase Runners slightly
+    { REGULAR: 0.48, RUNNER: 0.3, BRUTE: 0.1, DOG: 0.12 }, // Wave 9: Increase Brutes slightly
 
     // Wave 10-12: Continue gradual scaling
-    { REGULAR: 0.55, RUNNER: 0.35, BRUTE: 0.1 }, // Wave 10: More Runners
-    { REGULAR: 0.5, RUNNER: 0.35, BRUTE: 0.15 }, // Wave 11: More Brutes
-    { REGULAR: 0.45, RUNNER: 0.4, BRUTE: 0.15 }, // Wave 12: Fewer Regulars, more Runners
+    { REGULAR: 0.43, RUNNER: 0.35, BRUTE: 0.1, DOG: 0.12 }, // Wave 10: More Runners
+    { REGULAR: 0.38, RUNNER: 0.35, BRUTE: 0.15, DOG: 0.12 }, // Wave 11: More Brutes
+    { REGULAR: 0.33, RUNNER: 0.4, BRUTE: 0.15, DOG: 0.12 }, // Wave 12: Fewer Regulars, more Runners
 
     // Wave 13-15: Runners become the main type
-    { REGULAR: 0.4, RUNNER: 0.45, BRUTE: 0.15 }, // Wave 13: Runners outnumber Regulars
-    { REGULAR: 0.35, RUNNER: 0.5, BRUTE: 0.15 }, // Wave 14: Half are Runners
-    { REGULAR: 0.3, RUNNER: 0.5, BRUTE: 0.2 }, // Wave 15: Increase Brutes to 20%
+    { REGULAR: 0.28, RUNNER: 0.42, BRUTE: 0.15, DOG: 0.15 }, // Wave 13: Runners outnumber Regulars
+    { REGULAR: 0.23, RUNNER: 0.47, BRUTE: 0.15, DOG: 0.15 }, // Wave 14: Half are Runners
+    { REGULAR: 0.2, RUNNER: 0.45, BRUTE: 0.2, DOG: 0.15 }, // Wave 15: Increase Brutes to 20%
 
     // Wave 16-18: Continue reducing regulars
-    { REGULAR: 0.25, RUNNER: 0.55, BRUTE: 0.2 }, // Wave 16: More Runners, fewer Regulars
-    { REGULAR: 0.2, RUNNER: 0.6, BRUTE: 0.2 }, // Wave 17: 60% Runners
-    { REGULAR: 0.15, RUNNER: 0.65, BRUTE: 0.2 }, // Wave 18: 65% Runners
+    { REGULAR: 0.15, RUNNER: 0.5, BRUTE: 0.2, DOG: 0.15 }, // Wave 16: More Runners, fewer Regulars
+    { REGULAR: 0.12, RUNNER: 0.51, BRUTE: 0.2, DOG: 0.17 }, // Wave 17
+    { REGULAR: 0.08, RUNNER: 0.55, BRUTE: 0.2, DOG: 0.17 }, // Wave 18
 
     // Wave 19-20: Final scaling
-    { REGULAR: 0.1, RUNNER: 0.7, BRUTE: 0.2 }, // Wave 19: Mostly Runners and Brutes
-    { REGULAR: 0.0, RUNNER: 0.8, BRUTE: 0.2 }, // Wave 20: No more Regular zombies
+    { REGULAR: 0.05, RUNNER: 0.58, BRUTE: 0.2, DOG: 0.17 }, // Wave 19: Mostly Runners and Brutes
+    { REGULAR: 0.0, RUNNER: 0.6, BRUTE: 0.2, DOG: 0.2 }, // Wave 20: No more Regular zombies
   ],
 }
 
@@ -117,8 +118,9 @@ const gameState = {
     REGULAR: 0,
     RUNNER: 0,
     BRUTE: 0,
+    DOG: 0,
     get total() {
-      return this.REGULAR + this.RUNNER + this.BRUTE
+      return this.REGULAR + this.RUNNER + this.BRUTE + this.DOG
     },
   },
   get weapon() {
@@ -158,6 +160,7 @@ export function initializeGameState() {
   gameState.zombiesKilled.REGULAR = 0
   gameState.zombiesKilled.RUNNER = 0
   gameState.zombiesKilled.BRUTE = 0
+  gameState.zombiesKilled.DOG = 0
   gameState.gameStartTime = Date.now()
   gameState.gameEndTime = 0
   gameState.gameTime = 0
