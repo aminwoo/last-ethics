@@ -76,6 +76,7 @@ export const WAVE_SETTINGS = {
 const gameState = {
   playerName: 'Survivor', // Default player name
   playerClass: null, // Selected character class
+  playerSurvivor: null, // Selected survivor model, cosmetic only
   classStats: null, // Stats from the selected class
   health: 100,
   maxHealth: 100,
@@ -176,6 +177,12 @@ export function initializeGameState() {
 }
 
 // Set the player's class and apply stats
+// The survivor is the authored outfit the player wears; it is cosmetic and
+// independent of the class, which is why it is stored separately.
+export function setPlayerSurvivor(survivor) {
+  gameState.playerSurvivor = survivor
+}
+
 export function setPlayerClass(classId) {
   gameState.playerClass = classId
   applyClassStats(classId)

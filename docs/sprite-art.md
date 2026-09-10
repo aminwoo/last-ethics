@@ -15,7 +15,7 @@ and prop atlases and the `src/gameplay/sprites.js` helpers that read them are
 retained as source art and are no longer used by the running game:
 
 - Enemies use four textured, rigged models with authored movement, attack and death clips. See `enemy-animation.md`.
-- The player uses the Quaternius survivor rigs, one outfit per class. See `player-animation.md`.
+- The player uses the Quaternius survivor rigs, chosen on the deployment screen. See `player-animation.md`.
 - The painted prop sprites have been replaced by the kit's authored streets, wrecks, barricades and junk. See `town.md`.
 
 Turrets, lights, weather and combat particles retain their existing rendering.

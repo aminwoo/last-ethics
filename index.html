@@ -54,10 +54,19 @@
     <!-- Class Selection Screen -->
     <div id="class-selection-screen" style="display: none">
       <div class="class-selection-content">
-        <div class="eyebrow">02 / SELECT YOUR SPECIALIST</div>
-        <h1>WHO HOLDS THE LINE?</h1>
-        <h2 id="player-name-display">Survivor</h2>
+        <header class="deploy-header">
+          <div class="deploy-heading">
+            <div class="eyebrow"><span>02</span>ASSEMBLE YOUR OPERATOR</div>
+            <h1>WHO HOLDS THE LINE?</h1>
+          </div>
+          <div class="deploy-callsign">
+            <span>CALLSIGN</span>
+            <h2 id="player-name-display">Survivor</h2>
+          </div>
+        </header>
 
+        <section class="deploy-step deploy-step-class">
+          <h3 class="step-label"><span>A</span>Specialist<em>Decides how you fight</em></h3>
         <div class="class-grid">
           <div class="class-card" data-class="soldier">
             <div class="class-icon">🎖️</div>
@@ -284,8 +293,35 @@
             </div>
           </div>
         </div>
+        </section>
 
-        <button id="confirm-class-btn" disabled>SELECT A CLASS</button>
+        <section class="deploy-step deploy-step-survivor">
+          <h3 class="step-label"><span>B</span>Survivor<em>Decides who holds the line</em></h3>
+          <div class="survivor-grid">
+            <div class="survivor-card" data-survivor="Matt">
+              <img src="/images/survivors/matt.png" alt="" width="384" height="480" />
+              <div class="survivor-name">Matt</div>
+              <div class="survivor-tag">Steady hand</div>
+            </div>
+            <div class="survivor-card" data-survivor="Sam">
+              <img src="/images/survivors/sam.png" alt="" width="384" height="480" />
+              <div class="survivor-name">Sam</div>
+              <div class="survivor-tag">Old guard</div>
+            </div>
+            <div class="survivor-card" data-survivor="Shaun">
+              <img src="/images/survivors/shaun.png" alt="" width="384" height="480" />
+              <div class="survivor-name">Shaun</div>
+              <div class="survivor-tag">Runs light</div>
+            </div>
+            <div class="survivor-card" data-survivor="Lis">
+              <img src="/images/survivors/lis.png" alt="" width="384" height="480" />
+              <div class="survivor-name">Lis</div>
+              <div class="survivor-tag">Picks fights</div>
+            </div>
+          </div>
+        </section>
+
+        <button id="confirm-class-btn" disabled>SELECT A SPECIALIST</button>
       </div>
     </div>
 

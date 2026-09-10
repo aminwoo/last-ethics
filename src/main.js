@@ -9,6 +9,7 @@ import {
   initializeGameState,
   getWaveInfo,
   setPlayerClass,
+  setPlayerSurvivor,
   gameOver,
 } from './core/gameState.js'
 import {
@@ -42,6 +43,7 @@ import {
 } from './gameplay/weapons.js'
 import * as ZombieSystem from './gameplay/zombies.js'
 import { disposeZombieVisual, preloadZombieVisuals } from './gameplay/zombieVisual.js'
+import { survivorForClass, preloadSurvivor, DEFAULT_SURVIVOR } from './gameplay/playerVisual.js'
 // Import turret functionality
 import {
   createSpawnTurrets,
@@ -79,6 +81,9 @@ const restartGameBtn = document.getElementById('restart-game-btn')
 // Flag to track if game is starting
 let isGameStarting = false
 let selectedClass = null
+let selectedSurvivor = DEFAULT_SURVIVOR
+// Choosing a survivor stops the roster from following the specialist choice.
+let survivorPinned = false
 let survival
 const pendingSpawns = []
 
@@ -196,36 +201,63 @@ async function initializeScene() {
 // Initialize the scene but don't start the game loop yet
 initializeScene()
 
-// Set up class selection handlers
+// Set up class and survivor selection handlers
 function initializeClassSelection() {
-  const classCards = document.querySelectorAll('.class-card')
+  const classCards = [...document.querySelectorAll('.class-card')]
+  const survivorCards = [...document.querySelectorAll('.survivor-card')]
 
-  classCards.forEach((card) => {
+  // Both rosters behave like radio groups, by pointer or by keyboard.
+  const asButton = (card, onChoose) => {
     card.tabIndex = 0
     card.setAttribute('role', 'button')
     card.setAttribute('aria-pressed', 'false')
     card.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click() }
     })
-    card.addEventListener('click', () => {
-      // Remove selected from all cards
-      classCards.forEach((c) => { c.classList.remove('selected'); c.setAttribute('aria-pressed', 'false') })
+    card.addEventListener('click', onChoose)
+  }
+  const mark = (cards, chosen) => {
+    for (const card of cards) {
+      const selected = card === chosen
+      card.classList.toggle('selected', selected)
+      card.setAttribute('aria-pressed', String(selected))
+    }
+  }
+  const chooseSurvivor = name => {
+    selectedSurvivor = name
+    mark(survivorCards, survivorCards.find(card => card.dataset.survivor === name))
+    // The model the player is about to wear is worth fetching now, not at deploy.
+    preloadSurvivor(name).catch(error => console.error('Survivor preload failed:', error))
+  }
 
-      // Add selected to clicked card
-      card.classList.add('selected')
-      card.setAttribute('aria-pressed', 'true')
-
-      // Store selected class
+  for (const card of classCards) {
+    asButton(card, () => {
       selectedClass = card.dataset.class
-
-      // Enable the confirm button
-      confirmClassBtn.disabled = false
-      confirmClassBtn.textContent = `PLAY AS ${getClass(selectedClass).name.toUpperCase()}`
+      mark(classCards, card)
+      // Each specialist has an outfit of their own; picking one moves the
+      // roster with it until the player pins a survivor themselves.
+      if (!survivorPinned) chooseSurvivor(survivorForClass(selectedClass))
+      updateDeployButton()
     })
-  })
+  }
+
+  for (const card of survivorCards) {
+    asButton(card, () => {
+      survivorPinned = true
+      chooseSurvivor(card.dataset.survivor)
+      updateDeployButton()
+    })
+  }
 
   // Confirm class button handler
   confirmClassBtn.addEventListener('click', confirmClassSelection)
+}
+
+function updateDeployButton() {
+  confirmClassBtn.disabled = !selectedClass
+  confirmClassBtn.textContent = selectedClass
+    ? `DEPLOY ${selectedSurvivor.toUpperCase()} / ${getClass(selectedClass).name.toUpperCase()}`
+    : 'SELECT A SPECIALIST'
 }
 
 // Function to confirm class selection and start the game
@@ -233,8 +265,9 @@ async function confirmClassSelection() {
   if (!selectedClass) return
   confirmClassBtn.disabled = true
 
-  // Set the player class
+  // Set the player class and the survivor who wears it
   setPlayerClass(selectedClass)
+  setPlayerSurvivor(selectedSurvivor)
 
   // Hide class selection screen
   classSelectionScreen.style.opacity = '0'

@@ -2,14 +2,18 @@
 
 The player is one of the Quaternius Zombie Apocalypse Kit's four authored survivors, so the survivor, the enemies and the town are all one art style. Provenance is in `public/models/survivors/README.md`. These are authored meshes, skeletons, textures and animation clips, not characters assembled from code geometry. The model rotates continuously with the existing mouse-aim heading.
 
-| Class | Survivor |
+The player picks their own survivor on the deployment screen, alongside their
+specialist. The class only supplies the default, so the two selections stay in
+step until the player chooses a survivor themselves:
+
+| Class | Default survivor |
 | --- | --- |
 | Soldier | Matt |
 | Heavy, Engineer | Sam |
 | Scout, Assassin | Shaun |
 | Medic | Lis |
 
-Six classes share four outfits rather than wearing tinted copies of one: the kit's texture is a palette atlas and takes tinting badly. Multiplayer carries no class over the wire, so remote survivors are spread across the four outfits by a hash of the peer id — four distinct people rather than four copies of the same one. Only the survivors a session needs are fetched.
+Six classes share four outfits rather than wearing tinted copies of one: the kit's texture is a palette atlas and takes tinting badly. The choice is cosmetic — `gameState.playerSurvivor` never touches the class stats. Multiplayer carries neither over the wire, so remote survivors are spread across the four outfits by a hash of the peer id — four distinct people rather than four copies of the same one. Only the survivors a session needs are fetched, and choosing one on the deployment screen starts fetching it there.
 
 `src/gameplay/playerVisual.js` loads and caches each asset, clones its skeleton per player, and splits the kit's named clips into two layers by bone:
 
@@ -42,4 +46,4 @@ Every weapon gets a muzzle anchor at the forward tip of its own geometry, so bul
 
 ## Validation
 
-Production build, the survival regression tests, and tests that parse the real rigs, clips and weapon meshes (omitting only image decoding, which Node has no decoder for): each class's survivor stands 2.8 units with its feet on the ground, legs and upper body run independently through firing and reloading, repeated zero-time updates never accumulate procedural offsets, each anchor shows exactly its own weapon and every barrel tracks that mesh's muzzle, clones stay independent, and removal during loading cannot attach a ghost survivor after a restart. Checked in the running game in a browser: the soldier, scout, heavy and medic outfits each deploy and stand on the asphalt, and the held mesh changes with the equipped weapon.
+Production build, the survival regression tests, and tests that parse the real rigs, clips and weapon meshes (omitting only image decoding, which Node has no decoder for): each class's survivor stands 2.8 units with its feet on the ground, legs and upper body run independently through firing and reloading, repeated zero-time updates never accumulate procedural offsets, each anchor shows exactly its own weapon and every barrel tracks that mesh's muzzle, clones stay independent, and removal during loading cannot attach a ghost survivor after a restart. Checked in the running game in a browser: the soldier, scout, heavy and medic outfits each deploy and stand on the asphalt, the held mesh changes with the equipped weapon, and a survivor picked against the class default (Shaun as a medic) is the one that reaches the arena.
